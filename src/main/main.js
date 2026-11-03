@@ -59,17 +59,19 @@ function startLocalServer() {
         reqPath = '/renderer' + reqPath;
       }
       const filePath = path.join(__dirname, '..', reqPath);
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      fs.readFile(filePath, (err, data) => {
+        if (err || !data) {
+          res.writeHead(404);
+          res.end('Not Found');
+          return;
+        }
         const ext = path.extname(filePath);
         res.writeHead(200, {
           'Content-Type': mimeTypes[ext] || 'application/octet-stream',
           'Access-Control-Allow-Origin': '*',
         });
-        fs.createReadStream(filePath).pipe(res);
-      } else {
-        res.writeHead(404);
-        res.end('Not Found');
-      }
+        res.end(data);
+      });
     });
 
     localServer.listen(0, '127.0.0.1', () => {
@@ -179,12 +181,21 @@ async function createWindow() {
     musicVolume,
     villageEnabled,
     snowScale,
+    autoStart: app.getLoginItemSettings().openAtLogin,
     onToggleMode: (mode) => setMode(mode),
     onSetScale: (scale) => setScale(scale),
     onSettingChange: (key, val) => handleSettingChange(key, val),
     onTogglePause: () => togglePause(),
     onResetSnow: () => mainWindow.webContents.send('reset-snow'),
     onToggleHud: () => mainWindow.webContents.send('toggle-hud'),
+    onToggleAutoStart: () => {
+      const current = app.getLoginItemSettings().openAtLogin;
+      app.setLoginItemSettings({
+        openAtLogin: !current,
+        path: process.execPath,
+      });
+      updateTray();
+    },
     onQuit: () => {
       cleanup();
       app.quit();
@@ -292,6 +303,7 @@ function updateTray() {
       musicVolume,
       villageEnabled,
       snowScale,
+      autoStart: app.getLoginItemSettings().openAtLogin,
     });
   }
 }

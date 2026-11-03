@@ -23,12 +23,14 @@ export function setupTray({
   musicVolume = 75,
   villageEnabled = false,
   snowScale = 6,
+  autoStart = false,
   onToggleMode,
   onSetScale,
   onSettingChange,
   onTogglePause,
   onResetSnow,
   onToggleHud,
+  onToggleAutoStart,
   onQuit,
 }) {
   const iconPath = path.join(__dirname, '../../assets/icon.png');
@@ -51,6 +53,7 @@ export function setupTray({
     const vol = state.musicVolume ?? musicVolume;
     const village = state.villageEnabled ?? villageEnabled;
     const sScale = state.snowScale ?? snowScale;
+    const runOnStartup = state.autoStart ?? autoStart;
 
     const contextMenu = Menu.buildFromTemplate([
       {
@@ -396,6 +399,13 @@ export function setupTray({
       },
       { type: 'separator' },
       {
+        label: 'Start on Windows Startup',
+        type: 'checkbox',
+        checked: runOnStartup,
+        click: () => onToggleAutoStart && onToggleAutoStart(),
+      },
+      { type: 'separator' },
+      {
         label: 'Quit Interactive Wallpaper',
         click: () => onQuit(),
       },
@@ -416,6 +426,9 @@ export function setupTray({
     santaFreq,
     musicPlaying,
     musicVolume,
+    villageEnabled,
+    snowScale,
+    autoStart,
   });
 
   tray.on('double-click', () => {
