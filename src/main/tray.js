@@ -229,6 +229,10 @@ export function setupTray({
           },
           { type: 'separator' },
           {
+            label: '⛄ Build Another Snowman Now',
+            click: () => onSettingChange('buildSnowmanNow', true),
+          },
+          {
             label: 'Clear / Reset Snow Drift',
             click: () => onResetSnow(),
           },

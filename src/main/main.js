@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, session } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { wallpaper } from './wallpaper.js';
@@ -9,6 +9,11 @@ const __dirname = path.dirname(__filename);
 
 // Disable hardware acceleration so Chromium renders cleanly into GDI WorkerW wallpaper layer
 app.disableHardwareAcceleration();
+
+// Allow audio playback without requiring prior user gestures
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 // Application state
 let mainWindow = null;
@@ -47,7 +52,6 @@ function getTaskbarInsets() {
     const left = Math.max(0, workArea.x - bounds.x);
     const right = Math.max(0, bounds.width - (workArea.x - bounds.x + workArea.width));
 
-    // If taskbar is auto-hidden, Windows keeps <= 4px for peek trigger. Treat as 0.
     return {
       bottom: bottom > 4 ? bottom : 0,
       top: top > 4 ? top : 0,
@@ -69,6 +73,21 @@ function sendTaskbarInsets() {
 }
 
 async function createWindow() {
+  // Ensure YouTube requests pass valid Referer / Origin headers
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (details.url.includes('youtube.com') || details.url.includes('youtube-nocookie.com')) {
+      details.requestHeaders['Referer'] = 'https://www.youtube.com/';
+      details.requestHeaders['Origin'] = 'https://www.youtube.com';
+    }
+    callback({ requestHeaders: details.requestHeaders });
+  });
+
+  // Grant audio and media permissions unconditionally
+  session.defaultSession.setPermissionCheckHandler(() => true);
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true);
+  });
+
   const primaryDisplay = screen.getPrimaryDisplay();
   const { x, y, width, height } = primaryDisplay.bounds;
 
@@ -86,6 +105,8 @@ async function createWindow() {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      autoplayPolicy: 'no-user-gesture-required',
+      backgroundThrottling: false,
     },
   });
 

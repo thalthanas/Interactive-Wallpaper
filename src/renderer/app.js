@@ -96,12 +96,12 @@ function updateModeUI(mode) {
 }
 
 // YouTube Player Commands
-function sendYtCommand(func, args = '') {
+function sendYtCommand(func, args = []) {
   if (ytIframe && ytIframe.contentWindow) {
     const payload = JSON.stringify({
       event: 'command',
       func: func,
-      args: args,
+      args: Array.isArray(args) ? args : [args],
     });
     ytIframe.contentWindow.postMessage(payload, '*');
   }
@@ -110,12 +110,14 @@ function sendYtCommand(func, args = '') {
 function toggleMusicPlay() {
   isMusicPlaying = !isMusicPlaying;
   if (isMusicPlaying) {
-    sendYtCommand('playVideo');
+    sendYtCommand('unMute', []);
+    sendYtCommand('setVolume', [currentVolume]);
+    sendYtCommand('playVideo', []);
     btnMusicPlay.textContent = '⏸ Pause';
     musicStatus.textContent = 'Playing 🎵';
     showToast('Christmas Music: Playing');
   } else {
-    sendYtCommand('pauseVideo');
+    sendYtCommand('pauseVideo', []);
     btnMusicPlay.textContent = '▶ Play';
     musicStatus.textContent = 'Paused';
     showToast('Christmas Music: Paused');
@@ -131,9 +133,9 @@ function setVolume(vol) {
   labelVolume.textContent = `${vol}%`;
   sendYtCommand('setVolume', [vol]);
   if (vol === 0) {
-    sendYtCommand('mute');
+    sendYtCommand('mute', []);
   } else {
-    sendYtCommand('unMute');
+    sendYtCommand('unMute', []);
   }
 }
 
@@ -215,28 +217,55 @@ function setupEvents() {
 
   // Snowman Builder Action
   btnSpawnSnowman.addEventListener('click', () => {
-    engine.snowmanState = 'WALKING_IN';
-    engine.snowmanTimer = 0;
-    engine.child1.x = -15;
-    engine.child2.x = engine.virtualW + 15;
-    engine.child1.targetX = engine.snowmanX - 14;
-    engine.child2.targetX = engine.snowmanX + 14;
-    engine.snowmanBuildStage = 0;
+    engine.triggerBuildSnowmanNow();
     showToast('⛄ Children are coming to build a snowman!');
   });
 
   // Music Player Controls
   btnMusicPlay.addEventListener('click', toggleMusicPlay);
   btnMusicNext.addEventListener('click', () => {
-    sendYtCommand('nextVideo');
+    sendYtCommand('nextVideo', []);
+    sendYtCommand('unMute', []);
+    sendYtCommand('setVolume', [currentVolume]);
     showToast('Playing next song 🎵');
   });
   btnMusicPrev.addEventListener('click', () => {
-    sendYtCommand('previousVideo');
+    sendYtCommand('previousVideo', []);
+    sendYtCommand('unMute', []);
+    sendYtCommand('setVolume', [currentVolume]);
     showToast('Playing previous song 🎵');
   });
   sliderVolume.addEventListener('input', (e) => {
     setVolume(parseInt(e.target.value, 10));
+  });
+
+  // YouTube iframe handshake and state listener
+  if (ytIframe) {
+    ytIframe.addEventListener('load', () => {
+      ytIframe.contentWindow?.postMessage(JSON.stringify({ event: 'listening' }), '*');
+      sendYtCommand('setVolume', [currentVolume]);
+      sendYtCommand('unMute', []);
+    });
+  }
+
+  window.addEventListener('message', (e) => {
+    try {
+      const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      if (!data) return;
+      if (data.event === 'onStateChange') {
+        if (data.info === 1) {
+          isMusicPlaying = true;
+          btnMusicPlay.textContent = '⏸ Pause';
+          musicStatus.textContent = 'Playing 🎵';
+        } else if (data.info === 2) {
+          isMusicPlaying = false;
+          btnMusicPlay.textContent = '▶ Play';
+          musicStatus.textContent = 'Paused';
+        }
+      } else if (data.event === 'initialDelivery') {
+        sendYtCommand('setVolume', [currentVolume]);
+      }
+    } catch {}
   });
 
   // Reset Drift
@@ -345,15 +374,22 @@ function setupEvents() {
       } else if (data.key === 'flySantaNow') {
         engine.triggerSantaNow();
         showToast('🎅 Santa taking flight!');
+      } else if (data.key === 'buildSnowmanNow') {
+        engine.triggerBuildSnowmanNow();
+        showToast('⛄ Children are coming to build a snowman!');
       } else if (data.key === 'musicCommand') {
         if (data.value === 'play') {
           if (!isMusicPlaying) toggleMusicPlay();
         } else if (data.value === 'pause') {
           if (isMusicPlaying) toggleMusicPlay();
         } else if (data.value === 'next') {
-          sendYtCommand('nextVideo');
+          sendYtCommand('nextVideo', []);
+          sendYtCommand('unMute', []);
+          sendYtCommand('setVolume', [currentVolume]);
         } else if (data.value === 'prev') {
-          sendYtCommand('previousVideo');
+          sendYtCommand('previousVideo', []);
+          sendYtCommand('unMute', []);
+          sendYtCommand('setVolume', [currentVolume]);
         } else if (typeof data.value === 'number') {
           setVolume(data.value);
         }

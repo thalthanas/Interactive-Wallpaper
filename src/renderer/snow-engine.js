@@ -29,6 +29,24 @@ const DEFAULT_PALETTE = [
 const AXIS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const DIAG = [[1, 1], [-1, -1], [1, -1], [-1, 1]];
 
+// Hat colors for snowmen
+const HAT_COLORS = [
+  { hat: '#0f172a', ribbon: '#ef4444' }, // Classic Stovepipe Black + Red Ribbon
+  { hat: '#dc2626', ribbon: '#ffffff' }, // Santa Red + White Ribbon
+  { hat: '#15803d', ribbon: '#f59e0b' }, // Winter Emerald + Gold Ribbon
+  { hat: '#1d4ed8', ribbon: '#38bdf8' }, // Midnight Blue + Cyan Ribbon
+  { hat: '#78350f', ribbon: '#fbbf24' }, // Chestnut Brown + Yellow Ribbon
+  { hat: '#7e22ce', ribbon: '#f472b6' }, // Royal Purple + Pink Ribbon
+];
+
+const CHILD_OUTFITS = [
+  { coat: '#dc2626', hat: '#15803d', scarf: '#f59e0b' },
+  { coat: '#2563eb', hat: '#e11d48', scarf: '#10b981' },
+  { coat: '#059669', hat: '#d97706', scarf: '#ec4899' },
+  { coat: '#7c3aed', hat: '#0284c7', scarf: '#facc15' },
+  { coat: '#ea580c', hat: '#4f46e5', scarf: '#22c55e' },
+];
+
 export class SnowEngine {
   constructor(canvas) {
     this.canvas = canvas;
@@ -75,15 +93,20 @@ export class SnowEngine {
     // Continuous snowflakes simulation
     this.snowflakes = [];
 
-    // Children & Snowman State Machine
-    this.snowmanState = 'WAITING'; // 'WAITING' | 'WALKING_IN' | 'BUILDING' | 'CELEBRATING' | 'WALKING_OUT' | 'BUILT' | 'DESTROYED'
-    this.snowmanX = 160;
-    this.snowmanBuildTimer = 0;
-    this.snowmanBuildStage = 0; // 1 = base, 2 = torso, 3 = head & details
-    this.snowmanTimer = 0;
-    this.child1 = { x: -20, y: 0, targetX: 145, legPhase: 0, anim: 'walk' };
-    this.child2 = { x: 340, y: 0, targetX: 175, legPhase: 0, anim: 'walk' };
-    this.snowmanBounds = null; // for click detection
+    // Multi-Snowman Collection
+    this.snowmen = []; // Array of { id, x, scale, hatColor, ribbonColor, scarfColor, bounds }
+    this.nextSnowmanId = 1;
+
+    // Children Builder Team State
+    this.builderState = 'WAITING'; // 'WAITING' | 'WALKING_IN' | 'BUILDING' | 'CELEBRATING' | 'WALKING_OUT'
+    this.builderTargetX = 160;
+    this.builderTimer = 0;
+    this.builderStage = 0; // 1 = base, 2 = torso, 3 = head & details
+    this.builderCooldown = 12; // time until first attempt (12s)
+    this.pendingSnowmanConfig = null;
+
+    this.child1 = { x: -20, y: 0, legPhase: 0, outfit: CHILD_OUTFITS[0] };
+    this.child2 = { x: 340, y: 0, legPhase: 0, outfit: CHILD_OUTFITS[1] };
 
     // Santa Sleigh State
     this.santaEnabled = true;
@@ -118,18 +141,14 @@ export class SnowEngine {
     // Populate snowflakes based on density
     this.initSnowflakes();
 
-    // Default snowman position near center
-    this.snowmanX = Math.floor(this.virtualW * 0.5);
+    this.builderTargetX = Math.floor(this.virtualW * 0.5);
     this.child1.x = -20;
-    this.child1.targetX = this.snowmanX - 14;
     this.child2.x = this.virtualW + 20;
-    this.child2.targetX = this.snowmanX + 14;
   }
 
   initDrift(clearOnly = false) {
     this.driftHeights = new Float32Array(this.virtualW);
     if (!clearOnly) {
-      // Very gentle 2px baseline
       for (let x = 0; x < this.virtualW; x++) {
         this.driftHeights[x] = 2;
       }
@@ -223,11 +242,11 @@ export class SnowEngine {
     const vx = clientX / this.scale;
     const vy = clientY / this.scale;
 
-    // Check if clicked the Snowman!
-    if (this.snowmanState === 'BUILT' && this.snowmanBounds) {
-      const b = this.snowmanBounds;
-      if (vx >= b.x1 && vx <= b.x2 && vy >= b.y1 && vy <= b.y2) {
-        this.destroySnowman();
+    // Check if clicked ANY of the active Snowmen!
+    for (let i = this.snowmen.length - 1; i >= 0; i--) {
+      const s = this.snowmen[i];
+      if (s.bounds && vx >= s.bounds.x1 && vx <= s.bounds.x2 && vy >= s.bounds.y1 && vy <= s.bounds.y2) {
+        this.destroySnowman(i);
         return;
       }
     }
@@ -264,14 +283,12 @@ export class SnowEngine {
 
     for (let x = minX; x <= maxX; x++) {
       const driftTop = baseY - this.driftHeights[x];
-      // If cursor is near or inside the snow pile
       if (vy >= driftTop - 6 && vy <= baseY + 6) {
         const dist = Math.abs(x - vx);
         if (dist < radius) {
           const power = Math.max(0, 1 - dist / radius);
           this.driftHeights[x] = Math.max(0, this.driftHeights[x] - power * 1.6);
 
-          // Snow spray particles when carving
           if (Math.random() < 0.2) {
             this.interactiveParticles.push({
               x: x,
@@ -297,43 +314,128 @@ export class SnowEngine {
     this.santaSpeed = 42 + Math.random() * 16;
   }
 
-  destroySnowman() {
-    if (this.snowmanState !== 'BUILT') return;
-    this.snowmanState = 'DESTROYED';
-    this.snowmanTimer = 0;
+  triggerBuildSnowmanNow() {
+    const spot = this.findEmptySpot();
+    if (spot !== null) {
+      this.startBuildingAt(spot);
+    } else {
+      // If full, rebuild at center
+      this.startBuildingAt(Math.floor(this.virtualW * 0.5));
+    }
+  }
 
-    // Trigger official pixelfx Snowflake Burst effect at snowman location!
+  findEmptySpot() {
+    const W = this.virtualW;
+    const taskbarLeft = Math.floor((this.insets.left || 0) / this.scale);
+    const taskbarRight = Math.floor((this.insets.right || 0) / this.scale);
+    const minX = taskbarLeft + 28;
+    const maxX = W - taskbarRight - 28;
+
+    const center = Math.floor(W * 0.5);
+    const hasCenter = this.snowmen.some((s) => Math.abs(s.x - center) < 32);
+
+    // If center is empty, prefer center
+    if (!hasCenter && center >= minX && center <= maxX) {
+      return center;
+    }
+
+    // Try candidate spots across screen
+    const candidates = [
+      Math.floor(W * 0.28),
+      Math.floor(W * 0.72),
+      Math.floor(W * 0.40),
+      Math.floor(W * 0.60),
+      Math.floor(W * 0.18),
+      Math.floor(W * 0.82),
+    ];
+
+    // Filter spots with clearance >= 36px from any existing snowman
+    const valid = candidates.filter((cx) => {
+      if (cx < minX || cx > maxX) return false;
+      return !this.snowmen.some((s) => Math.abs(s.x - cx) < 36);
+    });
+
+    if (valid.length > 0) {
+      return valid[Math.floor(Math.random() * valid.length)];
+    }
+    return null;
+  }
+
+  startBuildingAt(targetX) {
+    this.builderState = 'WALKING_IN';
+    this.builderTargetX = targetX;
+    this.builderTimer = 0;
+    this.builderStage = 0;
+
+    const taskbarLeft = Math.floor((this.insets.left || 0) / this.scale);
+    const taskbarRight = Math.floor((this.insets.right || 0) / this.scale);
+
+    this.child1.x = taskbarLeft - 18;
+    this.child2.x = this.virtualW - taskbarRight + 18;
+
+    // Pick new outfits for this build
+    this.child1.outfit = CHILD_OUTFITS[Math.floor(Math.random() * CHILD_OUTFITS.length)];
+    this.child2.outfit = CHILD_OUTFITS[Math.floor(Math.random() * CHILD_OUTFITS.length)];
+
+    // Randomize snowman appearance: scale (0.8x to 1.25x), hat style, scarf
+    const hatChoice = HAT_COLORS[Math.floor(Math.random() * HAT_COLORS.length)];
+    const scales = [0.8, 0.95, 1.0, 1.15, 1.25];
+    const chosenScale = scales[Math.floor(Math.random() * scales.length)];
+
+    this.pendingSnowmanConfig = {
+      id: this.nextSnowmanId++,
+      x: targetX,
+      scale: chosenScale,
+      hatColor: hatChoice.hat,
+      ribbonColor: hatChoice.ribbon,
+      scarfColor: this.child1.outfit.scarf,
+    };
+  }
+
+  destroySnowman(index) {
+    if (index < 0 || index >= this.snowmen.length) return;
+    const s = this.snowmen[index];
+    this.snowmen.splice(index, 1);
+
+    const taskbarBottom = Math.floor((this.insets.bottom || 0) / this.scale);
+    const baseY = this.virtualH - taskbarBottom;
+    const sx = Math.floor(s.x);
+    const groundY = Math.floor(baseY - (this.driftHeights ? this.driftHeights[sx] || 0 : 0));
+    const bodyCenterY = groundY - Math.round(9 * s.scale);
+
+    // FIX: snowflake-burst has internal CY = -48 offset!
+    // Passing (bodyCenterY + 48) makes the burst land directly on the snowman's body!
     const fx = createFx(snowflakeBurst, {
-      x: this.snowmanX,
-      y: this.snowmanBounds ? Math.floor((this.snowmanBounds.y1 + this.snowmanBounds.y2) * 0.5) : 140,
-      count: 14,
+      x: s.x,
+      y: bodyCenterY + 48,
+      count: Math.round(14 * s.scale),
     });
     this.activeFx.push(fx);
 
-    // Additional ice shatter explosion motes
-    for (let i = 0; i < 24; i++) {
+    // Additional ice shatter motes directly at the body
+    const moteCount = Math.round(22 * s.scale);
+    for (let i = 0; i < moteCount; i++) {
       const a = Math.random() * TAU;
-      const sp = 20 + Math.random() * 55;
+      const sp = 20 + Math.random() * 50;
       this.interactiveParticles.push({
-        x: this.snowmanX + (Math.random() - 0.5) * 10,
-        y: this.snowmanBounds ? this.snowmanBounds.y1 + 8 : 140,
+        x: s.x + (Math.random() - 0.5) * (10 * s.scale),
+        y: bodyCenterY + (Math.random() - 0.5) * (8 * s.scale),
         vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 15,
-        life: 0.8 + Math.random() * 0.7,
-        maxLife: 1.5,
+        vy: Math.sin(a) * sp - 12,
+        life: 0.7 + Math.random() * 0.6,
+        maxLife: 1.3,
         size: Math.random() < 0.5 ? 2 : 1,
-        crystal: Math.random() < 0.3,
+        crystal: Math.random() < 0.35,
         glow: true,
       });
     }
 
     // Add fallen snow mound underneath
     if (this.driftHeights) {
-      const sx = Math.floor(this.snowmanX);
       for (let dx = -8; dx <= 8; dx++) {
         const x = sx + dx;
         if (x >= 0 && x < this.virtualW) {
-          this.driftHeights[x] += (1 - Math.abs(dx) / 9) * 3;
+          this.driftHeights[x] += (1 - Math.abs(dx) / 9) * 2.8;
         }
       }
     }
@@ -346,7 +448,6 @@ export class SnowEngine {
     const W = this.virtualW;
     const H = this.virtualH;
 
-    // Taskbar insets scaled to virtual resolution
     const taskbarBottom = Math.floor((this.insets.bottom || 0) / this.scale);
     const taskbarLeft = Math.floor((this.insets.left || 0) / this.scale);
     const taskbarRight = Math.floor((this.insets.right || 0) / this.scale);
@@ -367,11 +468,9 @@ export class SnowEngine {
       f.y += f.fallSpeed * dt;
       f.spin += f.spinSpeed * dt;
 
-      // Wrap horizontally within visible bounds
       if (f.x < taskbarLeft - 10) f.x += (W - taskbarLeft - taskbarRight) + 20;
       else if (f.x > W - taskbarRight + 10) f.x -= (W - taskbarLeft - taskbarRight) + 20;
 
-      // Check collision with the snow drift on top of the taskbar
       const ix = Math.floor(f.x);
       let hitBottom = false;
       if (ix >= taskbarLeft && ix < W - taskbarRight && this.driftHeights) {
@@ -402,8 +501,8 @@ export class SnowEngine {
       }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy += 26 * dt; // Gravity
-      p.vx *= 0.96;    // Drag
+      p.vy += 26 * dt;
+      p.vx *= 0.96;
       if (p.spin !== undefined) p.spin += p.spinSpeed * dt;
 
       const px = Math.floor(p.x);
@@ -425,7 +524,7 @@ export class SnowEngine {
       }
     }
 
-    // 5. Update Children & Snowman Lifecycle
+    // 5. Update Multi-Snowman & Children Builder Lifecycle
     this.updateChildrenAndSnowman(dt, baseY, taskbarLeft, W - taskbarRight);
 
     // 6. Update Santa Sleigh Flight
@@ -443,9 +542,8 @@ export class SnowEngine {
   smoothDrift(dt, minX, maxX) {
     if (!this.driftHeights) return;
     const heights = this.driftHeights;
-    const maxSlope = 1.0; // angle of repose: max height step before sliding
+    const maxSlope = 1.0;
 
-    // Avalanche pass: symmetric left and right
     for (let x = minX; x < maxX - 1; x++) {
       const diff = heights[x] - heights[x + 1];
       if (diff > maxSlope) {
@@ -459,7 +557,6 @@ export class SnowEngine {
       }
     }
 
-    // Symmetric smoothing diffusion
     const blend = Math.min(0.25, 6 * dt);
     const temp = new Float32Array(heights);
     for (let x = minX + 1; x < maxX - 1; x++) {
@@ -473,79 +570,74 @@ export class SnowEngine {
   }
 
   updateChildrenAndSnowman(dt, baseY, minX, maxX) {
-    this.snowmanTimer += dt;
-
-    // Check drift readiness to start building a snowman
-    if (this.snowmanState === 'WAITING') {
-      const midDrift = this.driftHeights ? this.driftHeights[this.snowmanX] || 0 : 0;
-      // Start when snow pile is at least 6px or after 25 seconds
-      if (midDrift >= 5 || this.snowmanTimer >= 25) {
-        this.snowmanState = 'WALKING_IN';
-        this.child1.x = minX - 15;
-        this.child2.x = maxX + 15;
-        this.child1.targetX = this.snowmanX - 14;
-        this.child2.targetX = this.snowmanX + 14;
-        this.snowmanBuildStage = 0;
+    // Check if ready to spawn children to build a snowman
+    if (this.builderState === 'WAITING') {
+      this.builderCooldown -= dt;
+      if (this.builderCooldown <= 0 && this.snowmen.length < 5) {
+        const spot = this.findEmptySpot();
+        if (spot !== null) {
+          const driftAtSpot = this.driftHeights ? this.driftHeights[spot] || 0 : 0;
+          if (driftAtSpot >= 3 || this.snowmen.length === 0) {
+            this.startBuildingAt(spot);
+          }
+        }
+        this.builderCooldown = 18 + Math.random() * 15;
       }
-    } else if (this.snowmanState === 'WALKING_IN') {
-      const sp = 18 * dt;
-      // Child 1 walks to right
-      if (this.child1.x < this.child1.targetX) {
-        this.child1.x = Math.min(this.child1.targetX, this.child1.x + sp);
+    } else if (this.builderState === 'WALKING_IN') {
+      const sp = 19 * dt;
+      const target1 = this.builderTargetX - 14;
+      const target2 = this.builderTargetX + 14;
+
+      if (this.child1.x < target1) {
+        this.child1.x = Math.min(target1, this.child1.x + sp);
         this.child1.legPhase += dt * 8;
       }
-      // Child 2 walks to left
-      if (this.child2.x > this.child2.targetX) {
-        this.child2.x = Math.max(this.child2.targetX, this.child2.x - sp);
+      if (this.child2.x > target2) {
+        this.child2.x = Math.max(target2, this.child2.x - sp);
         this.child2.legPhase += dt * 8;
       }
 
-      if (this.child1.x >= this.child1.targetX && this.child2.x <= this.child2.targetX) {
-        this.snowmanState = 'BUILDING';
-        this.snowmanBuildTimer = 0;
-        this.snowmanBuildStage = 1; // Start rolling bottom snowball
+      if (this.child1.x >= target1 && this.child2.x <= target2) {
+        this.builderState = 'BUILDING';
+        this.builderTimer = 0;
+        this.builderStage = 1;
       }
-    } else if (this.snowmanState === 'BUILDING') {
-      this.snowmanBuildTimer += dt;
-      if (this.snowmanBuildTimer > 2.2 && this.snowmanBuildStage === 1) {
-        this.snowmanBuildStage = 2; // Middle ball
-      } else if (this.snowmanBuildTimer > 4.4 && this.snowmanBuildStage === 2) {
-        this.snowmanBuildStage = 3; // Head & details
-      } else if (this.snowmanBuildTimer > 6.2 && this.snowmanBuildStage === 3) {
-        this.snowmanState = 'CELEBRATING';
-        this.snowmanBuildTimer = 0;
+    } else if (this.builderState === 'BUILDING') {
+      this.builderTimer += dt;
+      if (this.builderTimer > 2.0 && this.builderStage === 1) {
+        this.builderStage = 2; // Middle ball
+      } else if (this.builderTimer > 4.0 && this.builderStage === 2) {
+        this.builderStage = 3; // Head & hat
+      } else if (this.builderTimer > 5.8 && this.builderStage === 3) {
+        // Complete build WITHOUT particle burst!
+        this.builderState = 'CELEBRATING';
+        this.builderTimer = 0;
 
-        // Snowflake burst celebration pop!
-        const fx = createFx(snowflakeBurst, {
-          x: this.snowmanX,
-          y: baseY - (this.driftHeights[this.snowmanX] || 0) - 10,
-          count: 10,
-        });
-        this.activeFx.push(fx);
+        // Add to permanent snowmen collection!
+        if (this.pendingSnowmanConfig) {
+          this.snowmen.push({ ...this.pendingSnowmanConfig, bounds: null });
+        }
       }
-    } else if (this.snowmanState === 'CELEBRATING') {
-      this.snowmanBuildTimer += dt;
-      // Cheer jumps for 2 seconds
-      if (this.snowmanBuildTimer >= 2.2) {
-        this.snowmanState = 'WALKING_OUT';
-        this.child1.targetX = minX - 25;
-        this.child2.targetX = maxX + 25;
+    } else if (this.builderState === 'CELEBRATING') {
+      this.builderTimer += dt;
+      if (this.builderTimer >= 2.0) {
+        // Turn around and leave!
+        this.builderState = 'WALKING_OUT';
       }
-    } else if (this.snowmanState === 'WALKING_OUT') {
+    } else if (this.builderState === 'WALKING_OUT') {
       const sp = 20 * dt;
+      // Child 1 walks out to left (turns around to face left)
       this.child1.x -= sp;
       this.child1.legPhase += dt * 8;
+
+      // Child 2 walks out to right (turns around to face right)
       this.child2.x += sp;
       this.child2.legPhase += dt * 8;
 
-      if (this.child1.x < minX - 20 && this.child2.x > maxX + 20) {
-        this.snowmanState = 'BUILT';
-      }
-    } else if (this.snowmanState === 'DESTROYED') {
-      // Cooldown before next snowman can be built (70s)
-      if (this.snowmanTimer > 70) {
-        this.snowmanState = 'WAITING';
-        this.snowmanTimer = 0;
+      if (this.child1.x < minX - 25 && this.child2.x > maxX + 25) {
+        this.builderState = 'WAITING';
+        this.builderCooldown = 18 + Math.random() * 15; // cooldown before next snowman
+        this.pendingSnowmanConfig = null;
       }
     }
   }
@@ -557,16 +649,13 @@ export class SnowEngine {
       this.santaTimer -= dt;
       if (this.santaTimer <= 0) {
         this.triggerSantaNow();
-        // Reset timer to randomized interval around frequency (e.g. 30s to 180s)
         const jitter = (Math.random() - 0.5) * 20;
         this.santaTimer = Math.max(25, this.santaFrequency + jitter);
       }
     } else {
-      // Santa moves across sky with slight sine wave flight
       this.santaX += this.santaSpeed * this.santaDir * dt;
       this.santaY += Math.sin(this.time * 2.5) * 0.4;
 
-      // Spawn magical stardust trail
       if (Math.random() < 0.6) {
         this.santaTrail.push({
           x: this.santaX - this.santaDir * 18 + (Math.random() - 0.5) * 4,
@@ -578,7 +667,6 @@ export class SnowEngine {
         });
       }
 
-      // Check if finished flying across screen
       if (
         (this.santaDir === 1 && this.santaX > W + 90) ||
         (this.santaDir === -1 && this.santaX < -90)
@@ -587,7 +675,6 @@ export class SnowEngine {
       }
     }
 
-    // Update trail particles
     for (let i = this.santaTrail.length - 1; i >= 0; i--) {
       const pt = this.santaTrail[i];
       pt.life -= dt;
@@ -610,15 +697,15 @@ export class SnowEngine {
     const taskbarRight = Math.floor((this.insets.right || 0) / this.scale);
     const baseY = H - taskbarBottom;
 
-    // 1. Draw Night Sky Gradient & Stars
+    // 1. Night Sky Gradient & Stars
     this.renderSky(p, W, H, C);
 
-    // 2. Draw Santa Sleigh in Upper Sky
+    // 2. Santa Sleigh in Upper Sky
     if (this.santaActive || this.santaTrail.length > 0) {
       this.renderSanta(p);
     }
 
-    // 3. Draw Layer 0 (Far Snow Specks)
+    // 3. Layer 0 (Far Snow Specks)
     for (let i = 0; i < this.snowflakes.length; i++) {
       const f = this.snowflakes[i];
       if (f.layer === 0) {
@@ -626,13 +713,16 @@ export class SnowEngine {
       }
     }
 
-    // 4. Draw Snow Drift (Bottom Snow Bank on top of taskbar)
+    // 4. Snow Drift (Bottom Snow Bank on top of taskbar)
     this.renderDrift(p, W, baseY, taskbarLeft, W - taskbarRight, C);
 
-    // 5. Draw Snowman & Children (walking/building atop snow drift)
-    this.renderSnowmanAndChildren(p, baseY, C);
+    // 5. Render All Completed Snowmen
+    this.renderCompletedSnowmen(p, baseY, C);
 
-    // 6. Draw Layer 1 (Mid Drifting Flakes)
+    // 6. Render Children & In-Progress Snowman
+    this.renderChildrenAndBuildingSnowman(p, baseY, C);
+
+    // 7. Layer 1 (Mid Drifting Flakes)
     for (let i = 0; i < this.snowflakes.length; i++) {
       const f = this.snowflakes[i];
       if (f.layer === 1) {
@@ -646,7 +736,7 @@ export class SnowEngine {
       }
     }
 
-    // 7. Draw Layer 2 (Near Large 6-Arm Spinning Crystals)
+    // 8. Layer 2 (Near Large 6-Arm Spinning Crystals)
     for (let i = 0; i < this.snowflakes.length; i++) {
       const f = this.snowflakes[i];
       if (f.layer === 2) {
@@ -654,12 +744,12 @@ export class SnowEngine {
       }
     }
 
-    // 8. Draw Active Pixelfx FX (e.g. Snowflake Bursts)
+    // 9. Active Pixelfx FX (e.g. Snowflake Bursts)
     for (let i = 0; i < this.activeFx.length; i++) {
       this.activeFx[i].draw(this.frame);
     }
 
-    // 9. Draw Interactive Particles (mouse trails & bursts)
+    // 10. Interactive Particles (mouse trails & bursts)
     for (let i = 0; i < this.interactiveParticles.length; i++) {
       const pt = this.interactiveParticles[i];
       const alpha = pt.life / pt.maxLife;
@@ -675,7 +765,7 @@ export class SnowEngine {
       }
     }
 
-    // 10. Composite into Canvas ImageData
+    // 11. Composite into Canvas ImageData
     composite(this.frame, this.imgData.data, null);
     this.ctx.putImageData(this.imgData, 0, 0);
   }
@@ -730,7 +820,6 @@ export class SnowEngine {
       }
     }
 
-    // Drift glints
     const glintCount = Math.floor((maxX - minX) * 0.08);
     for (let i = 0; i < glintCount; i++) {
       const gx = minX + Math.floor(rand(this.seed, i, 91) * (maxX - minX));
@@ -744,116 +833,205 @@ export class SnowEngine {
     }
   }
 
-  renderSnowmanAndChildren(p, baseY, C) {
-    const sx = Math.floor(this.snowmanX);
-    const groundY = Math.floor(baseY - (this.driftHeights ? this.driftHeights[sx] || 0 : 0));
+  renderCompletedSnowmen(p, baseY, C) {
+    for (let i = 0; i < this.snowmen.length; i++) {
+      const s = this.snowmen[i];
+      const sx = Math.floor(s.x);
+      const groundY = Math.floor(baseY - (this.driftHeights ? this.driftHeights[Math.max(0, Math.min(this.virtualW - 1, sx))] || 0 : 0));
+      s.bounds = this.drawSnowman(p, sx, groundY, s.scale, s.hatColor, s.ribbonColor, s.scarfColor, C);
 
-    // 1. Draw Snowman
-    if (this.snowmanState === 'BUILDING' || this.snowmanState === 'CELEBRATING' || this.snowmanState === 'WALKING_OUT' || this.snowmanState === 'BUILT') {
-      const stage = this.snowmanState === 'BUILDING' ? this.snowmanBuildStage : 3;
+      // Hover highlight
+      if (
+        s.bounds &&
+        this.mouseX >= s.bounds.x1 &&
+        this.mouseX <= s.bounds.x2 &&
+        this.mouseY >= s.bounds.y1 &&
+        this.mouseY <= s.bounds.y2
+      ) {
+        p.add(sx, groundY - Math.round(10 * s.scale), C[6], 0.4);
+      }
+    }
+  }
 
-      // Base Snowball (stage >= 1)
+  drawSnowman(p, sx, groundY, scale, hatColor, ribbonColor, scarfColor, C) {
+    const rBase = Math.round(4 * scale);
+    const rMid = Math.round(3 * scale);
+    const rHead = Math.max(2, Math.round(2 * scale));
+
+    const by = groundY - rBase;
+    const my = by - rBase - rMid + 1;
+    const hy = my - rMid - rHead + 1;
+
+    // 1. Bottom Snowball
+    for (let dy = -rBase; dy <= rBase; dy++) {
+      const w = Math.round(Math.sqrt(Math.max(0, rBase * rBase - dy * dy)));
+      for (let dx = -w; dx <= w; dx++) {
+        const c = dy > rBase * 0.3 ? C[6] : dy > rBase * 0.6 ? C[5] : WHITE;
+        p.put(sx + dx, by + dy, c);
+      }
+    }
+
+    // 2. Middle Snowball
+    for (let dy = -rMid; dy <= rMid; dy++) {
+      const w = Math.round(Math.sqrt(Math.max(0, rMid * rMid - dy * dy)));
+      for (let dx = -w; dx <= w; dx++) {
+        const c = dy > rMid * 0.4 ? C[6] : WHITE;
+        p.put(sx + dx, my + dy, c);
+      }
+    }
+    // Coal buttons
+    p.put(sx, my - 1, hex('#0f172a'));
+    p.put(sx, my + 1, hex('#0f172a'));
+
+    // Stick arms
+    const armLen = Math.round(3 * scale);
+    p.put(sx - rMid - 1, my, hex('#78350f'));
+    p.put(sx - rMid - 2, my - 1, hex('#78350f'));
+    p.put(sx + rMid + 1, my, hex('#78350f'));
+    p.put(sx + rMid + 2, my - 1, hex('#78350f'));
+
+    // 3. Head & Details
+    for (let dy = -rHead; dy <= rHead; dy++) {
+      const w = Math.round(Math.sqrt(Math.max(0, rHead * rHead - dy * dy)));
+      for (let dx = -w; dx <= w; dx++) {
+        p.put(sx + dx, hy + dy, WHITE);
+      }
+    }
+    // Coal Eyes
+    p.put(sx - 1, hy - 1, hex('#0f172a'));
+    p.put(sx + 1, hy - 1, hex('#0f172a'));
+    // Carrot Nose
+    p.put(sx, hy, hex('#ea580c'));
+    p.put(sx + 1, hy, hex('#ea580c'));
+
+    // Festive Scarf
+    if (scarfColor) {
+      for (let dx = -rHead; dx <= rHead; dx++) {
+        p.put(sx + dx, hy + rHead, hex(scarfColor));
+      }
+      p.put(sx - 1, hy + rHead + 1, hex(scarfColor)); // tail
+    }
+
+    // Top Hat
+    const brimW = Math.round(rHead * 1.5);
+    const hatH = Math.round(3 * scale);
+    for (let dx = -brimW; dx <= brimW; dx++) p.put(sx + dx, hy - rHead, hex(hatColor));
+    for (let dy = -rHead - hatH; dy < -rHead; dy++) {
+      for (let dx = -rHead; dx <= rHead; dx++) p.put(sx + dx, hy + dy, hex(hatColor));
+    }
+    // Hat Ribbon
+    for (let dx = -rHead; dx <= rHead; dx++) p.put(sx + dx, hy - rHead - 1, hex(ribbonColor));
+
+    return {
+      x1: sx - rBase - 2,
+      x2: sx + rBase + 2,
+      y1: hy - rHead - hatH - 2,
+      y2: groundY,
+    };
+  }
+
+  renderChildrenAndBuildingSnowman(p, baseY, C) {
+    // 1. In-progress snowman being built
+    if (this.builderState === 'BUILDING' && this.pendingSnowmanConfig) {
+      const s = this.pendingSnowmanConfig;
+      const sx = Math.floor(s.x);
+      const groundY = Math.floor(baseY - (this.driftHeights ? this.driftHeights[sx] || 0 : 0));
+      const stage = this.builderStage;
+
+      const rBase = Math.round(4 * s.scale);
+      const rMid = Math.round(3 * s.scale);
+      const rHead = Math.max(2, Math.round(2 * s.scale));
+
+      const by = groundY - rBase;
+      const my = by - rBase - rMid + 1;
+      const hy = my - rMid - rHead + 1;
+
+      // Base snowball (stage >= 1)
       if (stage >= 1) {
-        const by = groundY - 4;
-        for (let dy = -4; dy <= 4; dy++) {
-          const w = Math.round(Math.sqrt(Math.max(0, 16 - dy * dy)));
+        for (let dy = -rBase; dy <= rBase; dy++) {
+          const w = Math.round(Math.sqrt(Math.max(0, rBase * rBase - dy * dy)));
           for (let dx = -w; dx <= w; dx++) {
-            const c = dy > 1 ? C[6] : dy > 2 ? C[5] : WHITE;
-            p.put(sx + dx, by + dy, c);
+            p.put(sx + dx, by + dy, dy > 1 ? C[6] : WHITE);
           }
         }
       }
-
-      // Middle Snowball (stage >= 2)
+      // Torso snowball (stage >= 2)
       if (stage >= 2) {
-        const my = groundY - 11;
-        for (let dy = -3; dy <= 3; dy++) {
-          const w = Math.round(Math.sqrt(Math.max(0, 9 - dy * dy)));
+        for (let dy = -rMid; dy <= rMid; dy++) {
+          const w = Math.round(Math.sqrt(Math.max(0, rMid * rMid - dy * dy)));
           for (let dx = -w; dx <= w; dx++) {
-            const c = dy > 1 ? C[6] : WHITE;
-            p.put(sx + dx, my + dy, c);
+            p.put(sx + dx, my + dy, dy > 1 ? C[6] : WHITE);
           }
         }
-        // Stick Arms
-        p.put(sx - 4, my, hex('#78350f'));
-        p.put(sx - 5, my - 1, hex('#78350f'));
-        p.put(sx + 4, my, hex('#78350f'));
-        p.put(sx + 5, my - 1, hex('#78350f'));
-        // Coal buttons
-        p.put(sx, my - 1, hex('#0f172a'));
-        p.put(sx, my + 1, hex('#0f172a'));
+        p.put(sx - rMid - 1, my, hex('#78350f'));
+        p.put(sx + rMid + 1, my, hex('#78350f'));
       }
-
-      // Head & Details (stage >= 3)
+      // Head & Hat (stage >= 3)
       if (stage >= 3) {
-        const hy = groundY - 16;
-        for (let dy = -2; dy <= 2; dy++) {
-          const w = Math.round(Math.sqrt(Math.max(0, 4 - dy * dy)));
+        for (let dy = -rHead; dy <= rHead; dy++) {
+          const w = Math.round(Math.sqrt(Math.max(0, rHead * rHead - dy * dy)));
           for (let dx = -w; dx <= w; dx++) {
             p.put(sx + dx, hy + dy, WHITE);
           }
         }
-        // Coal Eyes
-        p.put(sx - 1, hy - 1, hex('#0f172a'));
-        p.put(sx + 1, hy - 1, hex('#0f172a'));
-        // Orange Carrot Nose
         p.put(sx, hy, hex('#ea580c'));
-        p.put(sx + 1, hy, hex('#ea580c'));
-        // Top Hat
-        for (let dx = -3; dx <= 3; dx++) p.put(sx + dx, hy - 3, hex('#1e293b')); // Brim
-        for (let dy = -6; dy <= -4; dy++) {
-          for (let dx = -2; dx <= 2; dx++) p.put(sx + dx, hy + dy, hex('#0f172a'));
-        }
-        // Red Hat Ribbon
-        for (let dx = -2; dx <= 2; dx++) p.put(sx + dx, hy - 4, hex('#ef4444'));
-
-        // Save bounds for interactive clicking
-        this.snowmanBounds = {
-          x1: sx - 7,
-          x2: sx + 7,
-          y1: hy - 7,
-          y2: groundY,
-        };
-
-        // Hover highlight
-        if (
-          this.snowmanState === 'BUILT' &&
-          this.mouseX >= this.snowmanBounds.x1 &&
-          this.mouseX <= this.snowmanBounds.x2 &&
-          this.mouseY >= this.snowmanBounds.y1 &&
-          this.mouseY <= this.snowmanBounds.y2
-        ) {
-          p.add(sx, hy, C[6], 0.4);
+        for (let dx = -Math.round(rHead * 1.4); dx <= Math.round(rHead * 1.4); dx++) {
+          p.put(sx + dx, hy - rHead, hex(s.hatColor));
         }
       }
     }
 
-    // 2. Draw Children
-    if (this.snowmanState === 'WALKING_IN' || this.snowmanState === 'BUILDING' || this.snowmanState === 'CELEBRATING' || this.snowmanState === 'WALKING_OUT') {
+    // 2. Children
+    if (this.builderState === 'WALKING_IN' || this.builderState === 'BUILDING' || this.builderState === 'CELEBRATING' || this.builderState === 'WALKING_OUT') {
       const c1x = Math.floor(this.child1.x);
       const c1y = Math.floor(baseY - (this.driftHeights ? this.driftHeights[Math.max(0, Math.min(this.virtualW - 1, c1x))] || 0 : 0));
       const c2x = Math.floor(this.child2.x);
       const c2y = Math.floor(baseY - (this.driftHeights ? this.driftHeights[Math.max(0, Math.min(this.virtualW - 1, c2x))] || 0 : 0));
 
-      const isCheering = this.snowmanState === 'CELEBRATING';
+      const isCheering = this.builderState === 'CELEBRATING';
       const cheerBob1 = isCheering ? Math.abs(Math.sin(this.time * 12)) * 3 : 0;
       const cheerBob2 = isCheering ? Math.abs(Math.sin(this.time * 12 + 0.8)) * 3 : 0;
 
-      // Child 1 (Red Parka, Green Beanie, Gold Scarf)
-      this.drawChild(p, c1x, c1y - cheerBob1, hex('#dc2626'), hex('#15803d'), hex('#f59e0b'), this.child1.legPhase, 1, isCheering);
+      // FIX: Direction facing!
+      // When walking in or building: Child 1 faces RIGHT (dir = 1), Child 2 faces LEFT (dir = -1)
+      // When walking out: Child 1 faces LEFT (dir = -1), Child 2 faces RIGHT (dir = 1)!
+      const c1Dir = this.builderState === 'WALKING_OUT' ? -1 : 1;
+      const c2Dir = this.builderState === 'WALKING_OUT' ? 1 : -1;
 
-      // Child 2 (Blue Coat, Red Beanie, Green Scarf)
-      this.drawChild(p, c2x, c2y - cheerBob2, hex('#2563eb'), hex('#e11d48'), hex('#10b981'), this.child2.legPhase, -1, isCheering);
+      // Child 1
+      this.drawChild(
+        p,
+        c1x,
+        c1y - cheerBob1,
+        hex(this.child1.outfit.coat),
+        hex(this.child1.outfit.hat),
+        hex(this.child1.outfit.scarf),
+        this.child1.legPhase,
+        c1Dir,
+        isCheering
+      );
+
+      // Child 2
+      this.drawChild(
+        p,
+        c2x,
+        c2y - cheerBob2,
+        hex(this.child2.outfit.coat),
+        hex(this.child2.outfit.hat),
+        hex(this.child2.outfit.scarf),
+        this.child2.legPhase,
+        c2Dir,
+        isCheering
+      );
     }
   }
 
   drawChild(p, x, y, coatColor, hatColor, scarfColor, legPhase, dir, cheering = false) {
-    // Height: ~13px
     const step = Math.sin(legPhase);
     const leg1 = step > 0.2 ? -1 : 0;
     const leg2 = step < -0.2 ? -1 : 0;
 
-    // Boots / Feet
+    // Boots
     p.put(x - 1, y + leg1, hex('#1e293b'));
     p.put(x + 1, y + leg2, hex('#1e293b'));
 
@@ -871,10 +1049,9 @@ export class SnowEngine {
 
     // Arms
     if (cheering) {
-      // Arms raised up celebrating
       p.put(x - 3, y - 6, coatColor);
       p.put(x + 3, y - 6, coatColor);
-      p.put(x - 3, y - 7, hex('#fed7aa')); // Mittens
+      p.put(x - 3, y - 7, hex('#fed7aa'));
       p.put(x + 3, y - 7, hex('#fed7aa'));
     } else {
       p.put(x - 3, y - 4, coatColor);
@@ -885,25 +1062,24 @@ export class SnowEngine {
     p.put(x - 1, y - 6, scarfColor);
     p.put(x, y - 6, scarfColor);
     p.put(x + 1, y - 6, scarfColor);
-    p.put(x - dir * 2, y - 5, scarfColor); // Trailing tail
+    p.put(x - dir * 2, y - 5, scarfColor); // Trailing tail opposite to walking direction!
 
-    // Face / Head
+    // Face
     for (let dy = -9; dy <= -7; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         p.put(x + dx, y + dy, hex('#fed7aa'));
       }
     }
-    // Eye dot
+    // Eye dot facing walking direction
     p.put(x + dir, y - 8, hex('#0f172a'));
 
-    // Hat / Beanie
+    // Beanie
     for (let dx = -2; dx <= 2; dx++) p.put(x + dx, y - 10, hatColor);
     p.put(x, y - 11, hatColor);
-    p.put(x, y - 12, WHITE); // White Pom-pom!
+    p.put(x, y - 12, WHITE); // Pom-pom!
   }
 
   renderSanta(p) {
-    // 1. Draw Stardust Trail
     for (let i = 0; i < this.santaTrail.length; i++) {
       const pt = this.santaTrail[i];
       const a = pt.life / pt.maxLife;
@@ -917,61 +1093,49 @@ export class SnowEngine {
 
     const sx = Math.round(this.santaX);
     const sy = Math.round(this.santaY);
-    const d = this.santaDir; // 1 = flying right, -1 = flying left
+    const d = this.santaDir;
 
-    // 2. Reindeer 1 (Lead Rudolph with glowing red nose!)
     this.drawReindeer(p, sx + d * 34, sy, d, true);
-
-    // 3. Reindeer 2 (Second in tandem)
     this.drawReindeer(p, sx + d * 18, sy + 1, d, false);
 
-    // Reins connecting to Sleigh
     p.put(sx + d * 12, sy, hex('#fbbf24'), 0.7);
     p.put(sx + d * 7, sy + 1, hex('#fbbf24'), 0.7);
 
-    // 4. Sleigh & Santa
     this.drawSleigh(p, sx, sy, d);
   }
 
   drawReindeer(p, x, y, dir, isRudolph = false) {
     const leg = Math.sin(this.time * 14);
 
-    // Body
     for (let dx = -4; dx <= 4; dx++) {
       for (let dy = -2; dy <= 1; dy++) {
         p.put(x + dx * dir, y + dy, hex('#78350f'));
       }
     }
-    // Neck & Head
     p.put(x + dir * 5, y - 2, hex('#78350f'));
     p.put(x + dir * 6, y - 3, hex('#9a3412'));
     p.put(x + dir * 7, y - 3, hex('#9a3412'));
 
-    // Antlers
     p.put(x + dir * 5, y - 4, hex('#451a03'));
     p.put(x + dir * 4, y - 5, hex('#451a03'));
     p.put(x + dir * 6, y - 5, hex('#451a03'));
 
-    // Rudolph glowing red nose!
     if (isRudolph) {
       p.put(x + dir * 8, y - 3, hex('#ef4444'));
-      p.add(x + dir * 8, y - 3, hex('#ef4444'), 0.85); // glowing halo
+      p.add(x + dir * 8, y - 3, hex('#ef4444'), 0.85);
     }
 
-    // Galloping legs
     p.put(x - dir * 3, y + (leg > 0 ? 3 : 2), hex('#451a03'));
     p.put(x + dir * 3, y + (leg < 0 ? 3 : 2), hex('#451a03'));
   }
 
   drawSleigh(p, x, y, dir) {
-    // Gold runners
     for (let dx = -8; dx <= 8; dx++) {
       p.put(x + dx * dir, y + 4, hex('#fbbf24'));
     }
-    p.put(x + dir * 9, y + 3, hex('#fbbf24')); // Curled front
+    p.put(x + dir * 9, y + 3, hex('#fbbf24'));
     p.put(x + dir * 9, y + 2, hex('#fbbf24'));
 
-    // Red sleigh body
     for (let dx = -7; dx <= 6; dx++) {
       for (let dy = 0; dy <= 3; dy++) {
         p.put(x + dx * dir, y + dy, hex('#dc2626'));
@@ -979,34 +1143,28 @@ export class SnowEngine {
     }
     p.put(x - dir * 8, y - 1, hex('#dc2626'));
 
-    // Sack of Gifts
     for (let dx = -6; dx <= -2; dx++) {
       for (let dy = -4; dy <= -1; dy++) {
         p.put(x + dx * dir, y + dy, hex('#15803d'));
       }
     }
-    p.put(x - dir * 4, y - 5, hex('#f59e0b')); // Gift parcel
+    p.put(x - dir * 4, y - 5, hex('#f59e0b'));
 
-    // Santa!
     const hx = x + dir * 1;
-    // Red coat
     for (let dx = -2; dx <= 2; dx++) {
       for (let dy = -3; dy <= -1; dy++) {
         p.put(hx + dx * dir, y + dy, hex('#dc2626'));
       }
     }
-    // White fur trim & beard
     p.put(hx, y - 2, WHITE);
     p.put(hx + dir * 1, y - 2, WHITE);
     p.put(hx + dir * 2, y - 3, WHITE);
 
-    // Face
     p.put(hx + dir * 1, y - 4, hex('#fed7aa'));
 
-    // Red hat with white pom-pom
     p.put(hx, y - 5, hex('#dc2626'));
     p.put(hx + dir * 1, y - 5, hex('#dc2626'));
-    p.put(hx - dir * 1, y - 6, WHITE); // Pom-pom
+    p.put(hx - dir * 1, y - 6, WHITE);
   }
 
   renderCrystal(p, x, y, r, angle, C, alpha = 1) {
