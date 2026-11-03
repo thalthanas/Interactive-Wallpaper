@@ -16,10 +16,9 @@
   <div id="hud-panel" class="hidden">
     <div class="hud-header">
       <div class="hud-title">
-        <span class="icon">❄</span>
         <span class="text">LiveWP Controls</span>
       </div>
-      <button id="btn-close-hud" class="btn-icon" title="Hide Controls (H)">✕</button>
+      <button id="btn-close-hud" class="btn-icon" title="Hide Controls (H)">&times;</button>
     </div>
 
     <div class="hud-body">
@@ -77,7 +76,7 @@
       <!-- Santa's Sleigh -->
       <div class="control-group section-box">
         <div class="label-row">
-          <span>🎅 Flying Santa Sleigh</span>
+          <span>Flying Santa Sleigh</span>
           <input type="checkbox" id="check-santa" checked>
         </div>
         <div class="label-row" style="margin-top: 4px;">
@@ -90,14 +89,14 @@
           </select>
         </div>
         <button id="btn-fly-santa" class="btn btn-secondary btn-sm" style="margin-top: 6px;">
-          <span>🛷 Fly Santa Now!</span>
+          <span>Fly Santa Now</span>
         </button>
       </div>
 
       <!-- Christmas Music Player -->
       <div class="control-group section-box">
         <div class="label-row">
-          <span>🎵 Christmas Music</span>
+          <span>Christmas Music</span>
           <span id="music-status" class="value-badge">Paused</span>
         </div>
         <!-- Embedded Visible Player in HUD -->
@@ -105,9 +104,9 @@
           <div id="yt-player-container"></div>
         </div>
         <div class="music-controls" style="margin-top: 8px;">
-          <button id="btn-music-prev" class="btn btn-secondary btn-sm" title="Previous Track">⏮ Prev</button>
-          <button id="btn-music-play" class="btn btn-primary btn-sm" title="Play / Pause">▶ Play</button>
-          <button id="btn-music-next" class="btn btn-secondary btn-sm" title="Next Track">⏭ Next</button>
+          <button id="btn-music-prev" class="btn btn-secondary btn-sm" title="Previous Track">Prev</button>
+          <button id="btn-music-play" class="btn btn-primary btn-sm" title="Play / Pause">Play</button>
+          <button id="btn-music-next" class="btn btn-secondary btn-sm" title="Next Track">Next</button>
         </div>
         <div class="label-row" style="margin-top: 6px;">
           <span style="font-size: 11px;">Volume</span>
@@ -116,31 +115,30 @@
         <input type="range" id="slider-volume" min="0" max="100" step="5" value="75">
       </div>
 
-      <!-- Holiday Star Tree -->
+      <!-- Background Village & Trees -->
       <div class="control-group section-box">
         <div class="label-row">
-          <span>⭐ Center Holiday Star Tree</span>
-          <input type="checkbox" id="check-star-tree" checked>
+          <span>Background Village & Trees</span>
+          <input type="checkbox" id="check-village">
         </div>
       </div>
 
       <!-- Interactive Actions -->
       <div class="button-row">
         <button id="btn-spawn-snowman" class="btn btn-secondary btn-sm">
-          <span>⛄ Build Another Snowman</span>
+          <span>Build Another Snowman</span>
         </button>
         <button id="btn-reset-drift" class="btn btn-secondary btn-sm" title="Clear snow drift with yellow snowplow">
-          <span>🚜 Clear Drift (Snowplow)</span>
+          <span>Clear Drift (Snowplow)</span>
         </button>
       </div>
 
       <div class="button-row">
         <button id="btn-toggle-mode" class="btn btn-primary">
-          <span id="mode-icon">🖥️</span>
           <span id="mode-text">Switch to Windowed</span>
         </button>
         <button id="btn-toggle-pause" class="btn btn-secondary">
-          <span id="pause-text">⏸ Pause</span>
+          <span id="pause-text">Pause</span>
         </button>
       </div>
 

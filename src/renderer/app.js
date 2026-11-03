@@ -23,8 +23,8 @@ const checkSanta = document.getElementById('check-santa');
 const selectSantaFreq = document.getElementById('select-santa-freq');
 const btnFlySanta = document.getElementById('btn-fly-santa');
 
-// Holiday Star Tree control
-const checkStarTree = document.getElementById('check-star-tree');
+// Background Village control
+const checkVillage = document.getElementById('check-village');
 
 // Music controls
 const musicStatus = document.getElementById('music-status');
@@ -124,11 +124,11 @@ function initYtPlayer() {
       onStateChange: (event) => {
         if (event.data === 1) {
           isMusicPlaying = true;
-          btnMusicPlay.textContent = '⏸ Pause';
-          musicStatus.textContent = 'Playing 🎵';
+          btnMusicPlay.textContent = 'Pause';
+          musicStatus.textContent = 'Playing';
         } else if (event.data === 2) {
           isMusicPlaying = false;
-          btnMusicPlay.textContent = '▶ Play';
+          btnMusicPlay.textContent = 'Play';
           musicStatus.textContent = 'Paused';
         }
         if (window.livewp) {
@@ -248,21 +248,21 @@ function setupEvents() {
 
   btnFlySanta.addEventListener('click', () => {
     engine.triggerSantaNow();
-    showToast('🎅 Santa is taking flight!');
+    showToast('Santa is taking flight!');
   });
 
-  // Holiday Star Tree Action
-  if (checkStarTree) {
-    checkStarTree.addEventListener('change', (e) => {
-      engine.starTreeEnabled = e.target.checked;
-      if (window.livewp) window.livewp.notifySetting('starTreeEnabled', e.target.checked);
+  // Background Village Action
+  if (checkVillage) {
+    checkVillage.addEventListener('change', (e) => {
+      engine.villageEnabled = e.target.checked;
+      if (window.livewp) window.livewp.notifySetting('villageEnabled', e.target.checked);
     });
   }
 
   // Snowman Builder Action
   btnSpawnSnowman.addEventListener('click', () => {
     engine.triggerBuildSnowmanNow();
-    showToast('⛄ Children are coming to build a snowman!');
+    showToast('Children are coming to build a snowman!');
   });
 
   // Music Player Controls
@@ -272,7 +272,7 @@ function setupEvents() {
       ytPlayer.nextVideo();
       ytPlayer.unMute();
       ytPlayer.setVolume(currentVolume);
-      showToast('Playing next song 🎵');
+      showToast('Playing next song');
     }
   });
   btnMusicPrev.addEventListener('click', () => {
@@ -280,7 +280,7 @@ function setupEvents() {
       ytPlayer.previousVideo();
       ytPlayer.unMute();
       ytPlayer.setVolume(currentVolume);
-      showToast('Playing previous song 🎵');
+      showToast('Playing previous song');
     }
   });
   sliderVolume.addEventListener('input', (e) => {
@@ -305,7 +305,7 @@ function setupEvents() {
   // Toggle Pause
   btnTogglePause.addEventListener('click', () => {
     engine.isPaused = !engine.isPaused;
-    pauseText.textContent = engine.isPaused ? '▶ Resume' : '⏸ Pause';
+    pauseText.textContent = engine.isPaused ? 'Resume' : 'Pause';
     showToast(engine.isPaused ? 'Animation Paused' : 'Animation Resumed');
     if (engine.isPaused) {
       engine.interactiveParticles = [];
@@ -354,7 +354,7 @@ function setupEvents() {
 
     window.livewp.onTogglePause((paused) => {
       engine.isPaused = paused;
-      pauseText.textContent = paused ? '▶ Resume' : '⏸ Pause';
+      pauseText.textContent = paused ? 'Resume' : 'Pause';
       if (paused) {
         engine.interactiveParticles = [];
       }
@@ -390,15 +390,15 @@ function setupEvents() {
       } else if (data.key === 'santaFreq') {
         engine.santaFrequency = data.value;
         selectSantaFreq.value = String(data.value);
-      } else if (data.key === 'starTreeEnabled') {
-        engine.starTreeEnabled = data.value;
-        if (checkStarTree) checkStarTree.checked = data.value;
+      } else if (data.key === 'villageEnabled') {
+        engine.villageEnabled = data.value;
+        if (checkVillage) checkVillage.checked = data.value;
       } else if (data.key === 'flySantaNow') {
         engine.triggerSantaNow();
-        showToast('🎅 Santa taking flight!');
+        showToast('Santa taking flight!');
       } else if (data.key === 'buildSnowmanNow') {
         engine.triggerBuildSnowmanNow();
-        showToast('⛄ Children are coming to build a snowman!');
+        showToast('Children are coming to build a snowman!');
       } else if (data.key === 'musicCommand') {
         if (data.value === 'play') {
           if (!isMusicPlaying) toggleMusicPlay();
@@ -428,13 +428,13 @@ function setupEvents() {
         currentMode = state.mode;
         currentScale = state.scale || 6;
         engine.isPaused = state.isPaused;
-        pauseText.textContent = engine.isPaused ? '▶ Resume' : '⏸ Pause';
+        pauseText.textContent = engine.isPaused ? 'Resume' : 'Pause';
         if (state.insets) {
           engine.setTaskbarInsets(state.insets);
         }
-        if (state.starTreeEnabled !== undefined) {
-          engine.starTreeEnabled = state.starTreeEnabled;
-          if (checkStarTree) checkStarTree.checked = state.starTreeEnabled;
+        if (state.villageEnabled !== undefined) {
+          engine.villageEnabled = state.villageEnabled;
+          if (checkVillage) checkVillage.checked = state.villageEnabled;
         }
         applyScale(currentScale);
         updateModeUI(currentMode);

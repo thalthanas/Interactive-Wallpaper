@@ -119,8 +119,8 @@ export class SnowEngine {
     this.santaSpeed = 45;
     this.santaTrail = [];
 
-    // Background Village & Holiday Star Tree
-    this.starTreeEnabled = true;
+    // Background Village & Trees (closed/disabled by default)
+    this.villageEnabled = false;
     this.villageHouses = [];
     this.villageTrees = [];
     this.villageSmoke = [];
@@ -606,8 +606,10 @@ export class SnowEngine {
     // 6. Update Santa Sleigh Flight
     this.updateSanta(dt, W);
 
-    // 7. Update Background Village (blinking window lights & smoke wisps)
-    this.updateVillage(dt, baseY);
+    // 7. Update Background Village (if enabled)
+    if (this.villageEnabled) {
+      this.updateVillage(dt, baseY);
+    }
 
     // 8. Update Yellow Snowplow Clearing Machine
     this.updateSnowPlow(dt, baseY);
@@ -801,8 +803,10 @@ export class SnowEngine {
       }
     }
 
-    // 3.5 Background Village & Pine Trees (Houses, snowy roofs, blinking lights, star tree)
-    this.renderBackgroundVillage(p, W, baseY, C);
+    // 3.5 Background Village & Pine Trees (Houses, snowy roofs, blinking lights, star tree - if enabled)
+    if (this.villageEnabled) {
+      this.renderBackgroundVillage(p, W, baseY, C);
+    }
 
     // 4. Snow Drift (Bottom Snow Bank on top of taskbar - covers village as snow accumulates!)
     this.renderDrift(p, W, baseY, taskbarLeft, W - taskbarRight, C);
@@ -1413,12 +1417,10 @@ export class SnowEngine {
       this.drawCottage(p, hx, hy, h);
     }
 
-    // 5. Big Holiday Pine Tree with Star (in the middle, toggleable from settings)
-    if (this.starTreeEnabled) {
-      const centerX = Math.floor(W * 0.5);
-      const centerY = Math.round(villageGroundY + Math.sin(centerX * 0.04 + 1.2) * 1.5);
-      this.drawBigStarTree(p, centerX, centerY, C);
-    }
+    // 5. Center Holiday Pine Tree with Star (in the middle)
+    const centerX = Math.floor(W * 0.5);
+    const centerY = Math.round(villageGroundY + Math.sin(centerX * 0.04 + 1.2) * 1.5);
+    this.drawBigStarTree(p, centerX, centerY, C);
   }
 
   drawCottage(p, x, groundY, h) {

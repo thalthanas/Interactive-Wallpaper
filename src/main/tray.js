@@ -21,7 +21,7 @@ export function setupTray({
   santaFreq = 60,
   musicPlaying = false,
   musicVolume = 75,
-  starTreeEnabled = true,
+  villageEnabled = false,
   onToggleMode,
   onSetScale,
   onSettingChange,
@@ -48,7 +48,7 @@ export function setupTray({
     const freq = state.santaFreq ?? santaFreq;
     const music = state.musicPlaying ?? musicPlaying;
     const vol = state.musicVolume ?? musicVolume;
-    const starTree = state.starTreeEnabled ?? starTreeEnabled;
+    const village = state.villageEnabled ?? villageEnabled;
 
     const contextMenu = Menu.buildFromTemplate([
       {
@@ -231,17 +231,17 @@ export function setupTray({
           },
           { type: 'separator' },
           {
-            label: '⭐ Center Holiday Star Tree',
+            label: 'Background Village & Trees',
             type: 'checkbox',
-            checked: starTree,
-            click: () => onSettingChange('starTreeEnabled', !starTree),
+            checked: village,
+            click: () => onSettingChange('villageEnabled', !village),
           },
           {
-            label: '⛄ Build Another Snowman Now',
+            label: 'Build Another Snowman Now',
             click: () => onSettingChange('buildSnowmanNow', true),
           },
           {
-            label: '🚜 Clear Snow Drift (Snowplow)',
+            label: 'Clear Snow Drift (Snowplow)',
             click: () => onResetSnow(),
           },
         ],
