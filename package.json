@@ -1,0 +1,17 @@
+{
+  "name": "livewp",
+  "version": "1.0.0",
+  "description": "Cross-platform interactive live wallpaper app powered by pixelfx",
+  "main": "src/main/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.2.1"
+  },
+  "dependencies": {
+    "koffi": "^3.3.6"
+  }
+}

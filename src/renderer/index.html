@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiveWP - Pixel Snow Live Wallpaper</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Pixel Canvas -->
+  <canvas id="wallpaper-canvas"></canvas>
+
+  <!-- Floating Control HUD (Toggle with 'H' or hover trigger) -->
+  <div id="hud-trigger" title="Hover or press 'H' to show controls">⚙</div>
+
+  <div id="hud-panel" class="hidden">
+    <div class="hud-header">
+      <div class="hud-title">
+        <span class="icon">❄</span>
+        <span class="text">LiveWP Controls</span>
+      </div>
+      <button id="btn-close-hud" class="btn-icon" title="Hide Controls (H)">✕</button>
+    </div>
+
+    <div class="hud-body">
+      <!-- Resolution & Scale -->
+      <div class="control-group">
+        <div class="label-row">
+          <span>Pixel Scale</span>
+          <span id="label-scale" class="value-badge">6x (320×180)</span>
+        </div>
+        <input type="range" id="slider-scale" min="1" max="8" step="1" value="6">
+        <div class="slider-marks">
+          <span>1x (Native)</span>
+          <span>4x</span>
+          <span>6x (Retro)</span>
+          <span>8x</span>
+        </div>
+      </div>
+
+      <!-- Snow Density -->
+      <div class="control-group">
+        <div class="label-row">
+          <span>Snowfall Density</span>
+          <span id="label-density" class="value-badge">Medium</span>
+        </div>
+        <input type="range" id="slider-density" min="0.3" max="3.0" step="0.1" value="1.0">
+      </div>
+
+      <!-- Snow Piling Accumulation -->
+      <div class="control-group">
+        <div class="label-row">
+          <span>Drift Piling Speed</span>
+          <span id="label-pile" class="value-badge">1.0x</span>
+        </div>
+        <input type="range" id="slider-pile" min="0" max="3.0" step="0.2" value="1.0">
+      </div>
+
+      <!-- Wind Intensity -->
+      <div class="control-group">
+        <div class="label-row">
+          <span>Wind Speed</span>
+          <span id="label-wind" class="value-badge">Gentle</span>
+        </div>
+        <input type="range" id="slider-wind" min="0" max="15" step="1" value="4">
+      </div>
+
+      <!-- Mode & Actions -->
+      <div class="button-row">
+        <button id="btn-toggle-mode" class="btn btn-primary">
+          <span id="mode-icon">🖥️</span>
+          <span id="mode-text">Switch to Windowed</span>
+        </button>
+        <button id="btn-reset-drift" class="btn btn-secondary">
+          <span>🧹 Reset Drift</span>
+        </button>
+      </div>
+
+      <div class="button-row">
+        <button id="btn-toggle-pause" class="btn btn-secondary">
+          <span id="pause-text">⏸ Pause</span>
+        </button>
+      </div>
+
+      <!-- Footer Info -->
+      <div class="hud-footer">
+        <span id="fps-counter">60 FPS</span>
+        <span id="res-display">1920 × 1080</span>
+        <span class="hint">Press <strong>H</strong> to hide/show</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">LiveWP Ready</div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
+
