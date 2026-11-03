@@ -19,6 +19,8 @@ const SetParent = user32.func('intptr_t __stdcall SetParent(intptr_t, intptr_t)'
 const SetWindowPos = user32.func('BOOL __stdcall SetWindowPos(intptr_t, intptr_t, int, int, int, int, UINT)');
 const SetWindowLongPtrW = user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t, int, intptr_t)');
 const GetWindowLongPtrW = user32.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t, int)');
+const GetParent = user32.func('intptr_t __stdcall GetParent(intptr_t)');
+const IsWindow = user32.func('BOOL __stdcall IsWindow(intptr_t)');
 const POINT = koffi.struct('POINT', { x: 'long', y: 'long' });
 const GetCursorPos = user32.func('BOOL __stdcall GetCursorPos(_Out_ POINT* pt)');
 const GetAsyncKeyState = user32.func('short __stdcall GetAsyncKeyState(int vKey)');
@@ -183,6 +185,20 @@ export async function attachToWallpaper(electronHwndBuf, bounds) {
     return true;
   } catch (err) {
     console.error('[LiveWP] Error attaching to wallpaper:', err);
+    return false;
+  }
+}
+
+/**
+ * Checks whether the window is currently attached to a live WorkerW parent.
+ */
+export function isAttached(electronHwndBuf) {
+  if (!workerWHwnd) return false;
+  try {
+    const hwnd = getHwndFromBuffer(electronHwndBuf);
+    const parent = GetParent(hwnd);
+    return parent === workerWHwnd && IsWindow(workerWHwnd) !== 0;
+  } catch {
     return false;
   }
 }

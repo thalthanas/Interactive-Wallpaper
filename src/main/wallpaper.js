@@ -40,6 +40,15 @@ class WallpaperManager {
     return false;
   }
 
+  checkAttached(window) {
+    if (this.platform === 'win32' && window && !window.isDestroyed()) {
+      const hwndBuf = window.getNativeWindowHandle();
+      this.isAttached = win32.isAttached(hwndBuf);
+      return this.isAttached;
+    }
+    return this.isAttached;
+  }
+
   startMouseTracking(webContents, getBounds) {
     if (this.platform === 'win32') {
       win32.startMouseTracking(webContents, getBounds);

@@ -459,6 +459,41 @@ function setupEvents() {
         if (state.insets) {
           engine.setTaskbarInsets(state.insets);
         }
+        if (state.density !== undefined) {
+          engine.density = state.density;
+          engine.initSnowflakes();
+          if (sliderDensity) sliderDensity.value = state.density;
+          if (labelDensity) {
+            const d = state.density;
+            labelDensity.textContent = d < 0.6 ? `Light (${d.toFixed(1)}x)` : d < 1.4 ? `Medium (${d.toFixed(1)}x)` : d < 2.2 ? `Heavy (${d.toFixed(1)}x)` : `Blizzard (${d.toFixed(1)}x)`;
+          }
+        }
+        if (state.pileSpeed !== undefined) {
+          engine.pileSpeed = state.pileSpeed;
+          if (sliderPile) sliderPile.value = state.pileSpeed;
+          if (labelPile) labelPile.textContent = state.pileSpeed === 0 ? 'Off (0x)' : `${state.pileSpeed.toFixed(1)}x`;
+        }
+        if (state.maxHeight !== undefined) {
+          engine.maxPileHeightRatio = state.maxHeight;
+          if (sliderMaxHeight) sliderMaxHeight.value = state.maxHeight;
+          if (labelMaxHeight) labelMaxHeight.textContent = `${Math.round(state.maxHeight * 100)}% Screen`;
+        }
+        if (state.wind !== undefined) {
+          engine.windBase = state.wind;
+          if (sliderWind) sliderWind.value = state.wind;
+          if (labelWind) {
+            const w = state.wind;
+            labelWind.textContent = w === 0 ? 'Calm (0)' : w <= 4 ? `Gentle (${w})` : w <= 8 ? `Brisk (${w})` : `Gale (${w})`;
+          }
+        }
+        if (state.santaEnabled !== undefined) {
+          engine.santaEnabled = state.santaEnabled;
+          if (checkSanta) checkSanta.checked = state.santaEnabled;
+        }
+        if (state.santaFreq !== undefined) {
+          engine.santaFrequency = state.santaFreq;
+          if (selectSantaFreq) selectSantaFreq.value = String(state.santaFreq);
+        }
         if (state.villageEnabled !== undefined) {
           engine.villageEnabled = state.villageEnabled;
           if (checkVillage) checkVillage.checked = state.villageEnabled;
@@ -467,6 +502,9 @@ function setupEvents() {
           engine.setSnowScale(state.snowScale);
           if (sliderSnowScale) sliderSnowScale.value = state.snowScale;
           if (labelSnowScale) labelSnowScale.textContent = formatSnowScaleLabel(state.snowScale);
+        }
+        if (state.musicVolume !== undefined) {
+          setVolume(state.musicVolume);
         }
         applyScale(currentScale);
         updateModeUI(currentMode);
