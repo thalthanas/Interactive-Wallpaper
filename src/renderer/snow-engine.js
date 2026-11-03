@@ -190,8 +190,8 @@ export class SnowEngine {
       layer === 0
         ? 18 + Math.random() * 12
         : layer === 1
-        ? 28 + Math.random() * 20
-        : 38 + Math.random() * 24;
+          ? 28 + Math.random() * 20
+          : 38 + Math.random() * 24;
 
     const swaySpeed = 1.0 + Math.random() * 2.2;
     const swayAmp = layer === 0 ? 0.6 : layer === 1 ? 1.4 : 2.5;
