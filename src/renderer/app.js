@@ -2,6 +2,7 @@ import { SnowEngine } from './snow-engine.js';
 
 // DOM Elements
 const canvas = document.getElementById('wallpaper-canvas');
+const snowCanvas = document.getElementById('snow-canvas');
 const ytIframe = document.getElementById('yt-player');
 const hudPanel = document.getElementById('hud-panel');
 const btnCloseHud = document.getElementById('btn-close-hud');
@@ -11,6 +12,8 @@ const sliderScale = document.getElementById('slider-scale');
 const labelScale = document.getElementById('label-scale');
 const sliderDensity = document.getElementById('slider-density');
 const labelDensity = document.getElementById('label-density');
+const sliderSnowScale = document.getElementById('slider-snow-scale');
+const labelSnowScale = document.getElementById('label-snow-scale');
 const sliderPile = document.getElementById('slider-pile');
 const labelPile = document.getElementById('label-pile');
 const sliderMaxHeight = document.getElementById('slider-max-height');
@@ -44,7 +47,17 @@ const pauseText = document.getElementById('pause-text');
 const fpsCounter = document.getElementById('fps-counter');
 const resDisplay = document.getElementById('res-display');
 // Initialize Snow Engine
-const engine = new SnowEngine(canvas);
+const engine = new SnowEngine(canvas, snowCanvas);
+
+function formatSnowScaleLabel(s) {
+  if (s === 1) return '1x (Fine - 1080p)';
+  if (s === 2) return '2x (Small)';
+  if (s === 3) return '3x (Medium-Small)';
+  if (s === 4) return '4x (Medium)';
+  if (s === 6) return '6x (Retro - Default)';
+  if (s === 8) return '8x (Extra Chunky)';
+  return `${s}x`;
+}
 
 let currentMode = 'wallpaper';
 let currentScale = 6;
@@ -207,6 +220,16 @@ function setupEvents() {
     labelDensity.textContent = d < 0.6 ? `Light (${d.toFixed(1)}x)` : d < 1.4 ? `Medium (${d.toFixed(1)}x)` : d < 2.2 ? `Heavy (${d.toFixed(1)}x)` : `Blizzard (${d.toFixed(1)}x)`;
     if (window.livewp) window.livewp.notifySetting('density', d);
   });
+
+  // Snowflake Scale Slider
+  if (sliderSnowScale) {
+    sliderSnowScale.addEventListener('input', (e) => {
+      const s = parseInt(e.target.value, 10);
+      engine.setSnowScale(s);
+      labelSnowScale.textContent = formatSnowScaleLabel(s);
+      if (window.livewp) window.livewp.notifySetting('snowScale', s);
+    });
+  }
 
   // Piling Speed Slider
   sliderPile.addEventListener('input', (e) => {
@@ -373,6 +396,10 @@ function setupEvents() {
         engine.initSnowflakes();
         sliderDensity.value = data.value;
         labelDensity.textContent = `${data.value.toFixed(1)}x`;
+      } else if (data.key === 'snowScale') {
+        engine.setSnowScale(data.value);
+        if (sliderSnowScale) sliderSnowScale.value = data.value;
+        if (labelSnowScale) labelSnowScale.textContent = formatSnowScaleLabel(data.value);
       } else if (data.key === 'pileSpeed') {
         engine.pileSpeed = data.value;
         sliderPile.value = data.value;
@@ -436,6 +463,11 @@ function setupEvents() {
           engine.villageEnabled = state.villageEnabled;
           if (checkVillage) checkVillage.checked = state.villageEnabled;
         }
+        if (state.snowScale !== undefined) {
+          engine.setSnowScale(state.snowScale);
+          if (sliderSnowScale) sliderSnowScale.value = state.snowScale;
+          if (labelSnowScale) labelSnowScale.textContent = formatSnowScaleLabel(state.snowScale);
+        }
         applyScale(currentScale);
         updateModeUI(currentMode);
       }
@@ -467,4 +499,4 @@ function loop(now) {
 handleResize();
 setupEvents();
 requestAnimationFrame(loop);
-showToast('LiveWP Ready - Press H for Controls');
+showToast('Interactive Wallpaper Ready - Press H for Controls');

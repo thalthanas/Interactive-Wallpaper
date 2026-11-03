@@ -5,18 +5,20 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' http://127.0.0.1:* https://www.youtube.com https://www.youtube-nocookie.com https://*.ytimg.com https://*.googlevideo.com; frame-src http://127.0.0.1:* https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LiveWP - Pixel Snow Live Wallpaper</title>
+  <title>Interactive Wallpaper - Pixel Snow Live Wallpaper</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <!-- Pixel Canvas -->
   <canvas id="wallpaper-canvas"></canvas>
+  <!-- Snowflake Canvas (Dedicated canvas for independent snowflake scaling) -->
+  <canvas id="snow-canvas"></canvas>
 
   <!-- Floating Control HUD (Toggle with 'H') -->
   <div id="hud-panel" class="hidden">
     <div class="hud-header">
       <div class="hud-title">
-        <span class="text">LiveWP Controls</span>
+        <span class="text">Interactive Wallpaper Controls</span>
       </div>
       <button id="btn-close-hud" class="btn-icon" title="Hide Controls (H)">&times;</button>
     </div>
@@ -44,6 +46,21 @@
           <span id="label-density" class="value-badge">Medium (1.0x)</span>
         </div>
         <input type="range" id="slider-density" min="0.3" max="3.0" step="0.1" value="1.0">
+      </div>
+
+      <!-- Snowflake Scale -->
+      <div class="control-group">
+        <div class="label-row">
+          <span>Snowflake Scale</span>
+          <span id="label-snow-scale" class="value-badge">6x (Retro - Default)</span>
+        </div>
+        <input type="range" id="slider-snow-scale" min="1" max="8" step="1" value="6">
+        <div class="slider-marks">
+          <span>1x (Fine)</span>
+          <span>3x</span>
+          <span>6x (Retro)</span>
+          <span>8x</span>
+        </div>
       </div>
 
       <!-- Snow Piling Accumulation -->

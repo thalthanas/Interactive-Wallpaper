@@ -34,6 +34,7 @@ let santaFreq = 60;
 let musicPlaying = false;
 let musicVolume = 75;
 let villageEnabled = false;
+let snowScale = 6;
 
 // Local HTTP Server to serve renderer over standard http origin (required for YouTube embedded audio)
 const mimeTypes = {
@@ -177,6 +178,7 @@ async function createWindow() {
     musicPlaying,
     musicVolume,
     villageEnabled,
+    snowScale,
     onToggleMode: (mode) => setMode(mode),
     onSetScale: (scale) => setScale(scale),
     onSettingChange: (key, val) => handleSettingChange(key, val),
@@ -253,6 +255,7 @@ function handleSettingChange(key, val) {
   else if (key === 'santaEnabled') santaEnabled = val;
   else if (key === 'santaFreq') santaFreq = val;
   else if (key === 'villageEnabled') villageEnabled = val;
+  else if (key === 'snowScale') snowScale = val;
   else if (key === 'musicCommand') {
     if (val === 'play') musicPlaying = true;
     else if (val === 'pause') musicPlaying = false;
@@ -288,6 +291,7 @@ function updateTray() {
       musicPlaying,
       musicVolume,
       villageEnabled,
+      snowScale,
     });
   }
 }
@@ -319,6 +323,7 @@ ipcMain.handle('get-initial-state', () => {
     musicPlaying,
     musicVolume,
     villageEnabled,
+    snowScale,
     insets,
     displayBounds: primaryDisplay.bounds,
   };

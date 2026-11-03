@@ -48,21 +48,30 @@ const CHILD_OUTFITS = [
 ];
 
 export class SnowEngine {
-  constructor(canvas) {
+  constructor(canvas, snowCanvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
+    this.snowCanvas = snowCanvas || (typeof document !== 'undefined' ? document.getElementById('snow-canvas') : null);
+    if (this.snowCanvas) {
+      this.snowCtx = this.snowCanvas.getContext('2d');
+    }
     this.scale = 6;
     this.density = 1.0;
     this.windBase = 4;
     this.pileSpeed = 1.0;
     this.maxPileHeightRatio = 0.25; // 25% screen height
     this.isPaused = false;
+    this.snowScale = 6; // Snowflake canvas pixel scale (1 = 1080p fine to 6 = retro default)
 
     // Taskbar insets (in screen pixels)
     this.insets = { bottom: 0, top: 0, left: 0, right: 0 };
 
+    this.screenWidth = 1920;
+    this.screenHeight = 1080;
     this.virtualW = 320;
     this.virtualH = 180;
+    this.snowVirtualW = 320;
+    this.snowVirtualH = 180;
     this.frame = null;
     this.imgData = null;
 
@@ -136,6 +145,8 @@ export class SnowEngine {
   }
 
   init(width, height, scale = 6) {
+    this.screenWidth = width;
+    this.screenHeight = height;
     this.scale = Math.max(1, Math.min(10, scale));
     this.virtualW = Math.max(160, Math.floor(width / this.scale));
     this.virtualH = Math.max(90, Math.floor(height / this.scale));
@@ -146,10 +157,13 @@ export class SnowEngine {
     this.frame = createFrame(this.virtualW, this.virtualH, 0, 0);
     this.imgData = this.ctx.createImageData(this.virtualW, this.virtualH);
 
+    // Initialize snow canvas resolution based on snowflake scale
+    this.initSnowCanvas();
+
     // Initialize snow pile height map along the bottom
     this.initDrift(false);
 
-    // Populate snowflakes based on density
+    // Populate snowflakes based on density and snowflake canvas resolution
     this.initSnowflakes();
 
     // Initialize background village & trees
@@ -164,6 +178,27 @@ export class SnowEngine {
       this.builderState = 'WAITING';
       this.builderCooldown = 4;
       this.pendingSnowmanConfig = null;
+    }
+  }
+
+  setSnowScale(scale) {
+    this.snowScale = Math.max(1, Math.min(10, scale));
+    this.initSnowCanvas();
+    this.initSnowflakes();
+  }
+
+  initSnowCanvas() {
+    if (!this.snowCanvas && typeof document !== 'undefined') {
+      this.snowCanvas = document.getElementById('snow-canvas');
+      if (this.snowCanvas) {
+        this.snowCtx = this.snowCanvas.getContext('2d');
+      }
+    }
+    this.snowVirtualW = Math.max(160, Math.floor(this.screenWidth / this.snowScale));
+    this.snowVirtualH = Math.max(90, Math.floor(this.screenHeight / this.snowScale));
+    if (this.snowCanvas) {
+      this.snowCanvas.width = this.snowVirtualW;
+      this.snowCanvas.height = this.snowVirtualH;
     }
   }
 
@@ -195,7 +230,7 @@ export class SnowEngine {
 
   initSnowflakes() {
     this.snowflakes = [];
-    const baseCount = Math.floor(this.virtualW * 0.9 * this.density);
+    const baseCount = Math.floor(this.snowVirtualW * 0.9 * this.density);
 
     for (let i = 0; i < baseCount; i++) {
       this.snowflakes.push(this.createFlake(true));
@@ -208,18 +243,19 @@ export class SnowEngine {
     if (layerRand > 0.85) layer = 2; // Near (spinning crystal)
     else if (layerRand > 0.5) layer = 1; // Mid (plus/flake)
 
-    const x = Math.random() * this.virtualW;
-    const y = randomY ? Math.random() * this.virtualH : -10 - Math.random() * 20;
+    const x = Math.random() * this.snowVirtualW;
+    const y = randomY ? Math.random() * this.snowVirtualH : -10 - Math.random() * 20;
 
+    const speedScale = Math.sqrt(this.snowVirtualH / 180);
     const fallSpeed =
-      layer === 0
+      (layer === 0
         ? 18 + Math.random() * 12
         : layer === 1
           ? 28 + Math.random() * 20
-          : 38 + Math.random() * 24;
+          : 38 + Math.random() * 24) * speedScale;
 
     const swaySpeed = 1.0 + Math.random() * 2.2;
-    const swayAmp = layer === 0 ? 0.6 : layer === 1 ? 1.4 : 2.5;
+    const swayAmp = (layer === 0 ? 0.6 : layer === 1 ? 1.4 : 2.5) * speedScale;
 
     return {
       x,
@@ -529,13 +565,17 @@ export class SnowEngine {
     const taskbarRight = Math.floor((this.insets.right || 0) / this.scale);
     const baseY = H - taskbarBottom;
 
+    const snowTaskbarLeft = Math.floor((this.insets.left || 0) / this.snowScale);
+    const snowTaskbarRight = Math.floor((this.insets.right || 0) / this.snowScale);
+    const snowBaseY = this.snowVirtualH - Math.floor((this.insets.bottom || 0) / this.snowScale);
+
     // Smooth periodic gusty wind
     const wind =
       this.windBase +
       5 * Math.sin((TAU * this.time) / 16 + 0.6) +
       2.5 * Math.sin((TAU * 2 * this.time) / 16 + 2.1);
 
-    // 1. Update continuous snowflakes
+    // 1. Update continuous snowflakes (simulating in snowflake canvas space)
     for (let i = 0; i < this.snowflakes.length; i++) {
       const f = this.snowflakes[i];
 
@@ -544,22 +584,28 @@ export class SnowEngine {
       f.y += f.fallSpeed * dt;
       f.spin += f.spinSpeed * dt;
 
-      if (f.x < taskbarLeft - 10) f.x += (W - taskbarLeft - taskbarRight) + 20;
-      else if (f.x > W - taskbarRight + 10) f.x -= (W - taskbarLeft - taskbarRight) + 20;
+      if (f.x < snowTaskbarLeft - 10) f.x += (this.snowVirtualW - snowTaskbarLeft - snowTaskbarRight) + 20;
+      else if (f.x > this.snowVirtualW - snowTaskbarRight + 10) f.x -= (this.snowVirtualW - snowTaskbarLeft - snowTaskbarRight) + 20;
 
-      const ix = Math.floor(f.x);
+      // Coordinate mapping to check collision with scene snow drift
+      const screenX = f.x * this.snowScale;
+      const sceneX = Math.floor(screenX / this.scale);
+
       let hitBottom = false;
-      if (ix >= taskbarLeft && ix < W - taskbarRight && this.driftHeights) {
-        const driftTop = baseY - this.driftHeights[ix];
-        if (f.y >= driftTop) {
+      if (sceneX >= taskbarLeft && sceneX < W - taskbarRight && this.driftHeights) {
+        const driftTopScene = baseY - this.driftHeights[sceneX];
+        const driftTopScreen = driftTopScene * this.scale;
+        const driftTopSnow = driftTopScreen / this.snowScale;
+
+        if (f.y >= driftTopSnow) {
           hitBottom = true;
           if (f.layer > 0) {
-            this.accumulateSnow(ix, f.layer === 2 ? 0.35 : 0.18);
+            this.accumulateSnow(sceneX, f.layer === 2 ? 0.35 : 0.18);
           }
         }
       }
 
-      if (f.y >= baseY || hitBottom) {
+      if (f.y >= snowBaseY || hitBottom || f.y > this.snowVirtualH + 15) {
         this.snowflakes[i] = this.createFlake(false);
       }
     }
@@ -795,14 +841,6 @@ export class SnowEngine {
       this.renderSanta(p);
     }
 
-    // 3. Layer 0 (Far Snow Specks)
-    for (let i = 0; i < this.snowflakes.length; i++) {
-      const f = this.snowflakes[i];
-      if (f.layer === 0) {
-        p.put(Math.round(f.x), Math.round(f.y), C[4], 0.7);
-      }
-    }
-
     // 3.5 Background Village & Pine Trees (Houses, snowy roofs, blinking lights, star tree - if enabled)
     if (this.villageEnabled) {
       this.renderBackgroundVillage(p, W, baseY, C);
@@ -822,34 +860,12 @@ export class SnowEngine {
       this.renderSnowPlow(p, baseY, C);
     }
 
-    // 7. Layer 1 (Mid Drifting Flakes)
-    for (let i = 0; i < this.snowflakes.length; i++) {
-      const f = this.snowflakes[i];
-      if (f.layer === 1) {
-        const rx = Math.round(f.x);
-        const ry = Math.round(f.y);
-        p.put(rx, ry, WHITE);
-        p.put(rx + 1, ry, C[6]);
-        p.put(rx - 1, ry, C[6]);
-        p.put(rx, ry + 1, C[6]);
-        p.put(rx, ry - 1, C[6]);
-      }
-    }
-
-    // 8. Layer 2 (Near Large 6-Arm Spinning Crystals)
-    for (let i = 0; i < this.snowflakes.length; i++) {
-      const f = this.snowflakes[i];
-      if (f.layer === 2) {
-        this.renderCrystal(p, f.x, f.y, f.crystalRadius, f.spin, C);
-      }
-    }
-
-    // 9. Active Pixelfx FX (e.g. Snowflake Bursts)
+    // 7. Active Pixelfx FX (e.g. Snowflake Bursts)
     for (let i = 0; i < this.activeFx.length; i++) {
       this.activeFx[i].draw(this.frame);
     }
 
-    // 10. Interactive Particles (mouse trails & bursts)
+    // 8. Interactive Particles (mouse trails & bursts)
     for (let i = 0; i < this.interactiveParticles.length; i++) {
       const pt = this.interactiveParticles[i];
       const alpha = pt.life / pt.maxLife;
@@ -865,9 +881,83 @@ export class SnowEngine {
       }
     }
 
-    // 11. Composite into Canvas ImageData
+    // 9. Composite into Scene Canvas ImageData
     composite(this.frame, this.imgData.data, null);
     this.ctx.putImageData(this.imgData, 0, 0);
+
+    // 10. Render Falling Snowflakes to Dedicated Snowflake Canvas
+    if (this.snowCtx) {
+      this.renderSnowCanvas();
+    }
+  }
+
+  renderSnowCanvas() {
+    const ctx = this.snowCtx;
+    const W = this.snowVirtualW;
+    const H = this.snowVirtualH;
+    ctx.clearRect(0, 0, W, H);
+
+    const C = this.colors;
+    const colorSpeck = 'rgba(82, 108, 156, 0.7)';
+    const colorCrossAccent = C[6];
+    const colorCrystalAccent = C[5];
+
+    // Layer 0: Far Specks
+    ctx.fillStyle = colorSpeck;
+    for (let i = 0; i < this.snowflakes.length; i++) {
+      const f = this.snowflakes[i];
+      if (f.layer === 0) {
+        ctx.fillRect(Math.round(f.x), Math.round(f.y), 1, 1);
+      }
+    }
+
+    // Layer 1: Mid Cross Flakes (Classic 5-pixel cross)
+    for (let i = 0; i < this.snowflakes.length; i++) {
+      const f = this.snowflakes[i];
+      if (f.layer === 1) {
+        const rx = Math.round(f.x);
+        const ry = Math.round(f.y);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(rx, ry, 1, 1);
+        ctx.fillStyle = colorCrossAccent;
+        ctx.fillRect(rx + 1, ry, 1, 1);
+        ctx.fillRect(rx - 1, ry, 1, 1);
+        ctx.fillRect(rx, ry + 1, 1, 1);
+        ctx.fillRect(rx, ry - 1, 1, 1);
+      }
+    }
+
+    // Layer 2: Near 6-Arm Spinning Crystals
+    for (let i = 0; i < this.snowflakes.length; i++) {
+      const f = this.snowflakes[i];
+      if (f.layer === 2) {
+        this.renderCrystalOnCanvas(ctx, f.x, f.y, f.crystalRadius, f.spin, colorCrossAccent, colorCrystalAccent);
+      }
+    }
+  }
+
+  renderCrystalOnCanvas(ctx, x, y, r, angle, accent1, accent2) {
+    const rx = Math.round(x);
+    const ry = Math.round(y);
+    const turn = (Math.floor(angle * 2) % 2) === 1;
+    const long = turn ? DIAG : AXIS;
+    const short = turn ? AXIS : DIAG;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(rx, ry, 1, 1);
+
+    for (const [dx, dy] of long) {
+      for (let d = 1; d <= r; d++) {
+        ctx.fillStyle = d === r ? '#ffffff' : accent1;
+        ctx.fillRect(rx + dx * d, ry + dy * d, 1, 1);
+      }
+    }
+    for (const [dx, dy] of short) {
+      for (let d = 1; d <= Math.max(1, Math.floor(r * 0.6)); d++) {
+        ctx.fillStyle = accent2;
+        ctx.fillRect(rx + dx * d, ry + dy * d, 1, 1);
+      }
+    }
   }
 
   renderSky(p, W, H, C) {

@@ -108,18 +108,21 @@ Special thanks and credit go to:
 4. **Background Operation**:
    - The wallpaper attaches immediately behind your desktop icons.
    - An icon appears in your Windows **System Tray** (notification area).
-   - Press <kbd>H</kbd> on your keyboard at any time to open or close the on-screen Control HUD.
+   - **Controls & HUD Access**:
+     - In **Windowed Mode**, press <kbd>H</kbd> on your keyboard to open or close the on-screen Control HUD.
+     - In **Desktop Wallpaper Mode**, the window is pinned behind your desktop icons and does not hold keyboard focus, so all settings, sliders, and toggles are accessed by **right-clicking the System Tray icon** (you can also switch to Windowed Mode via the tray at any time to use the <kbd>H</kbd> HUD).
 
 ---
 
 ## Scene Settings & Controls
 
-All settings can be customized from the **on-screen HUD** (<kbd>H</kbd>) or by **right-clicking the System Tray icon**:
+All settings can be customized by **right-clicking the System Tray icon** (in any mode) or from the **on-screen HUD** (<kbd>H</kbd> in Windowed Mode):
 
 | Setting | Options / Range | Description |
 | :--- | :--- | :--- |
 | **Pixel Art Scale** | 8x, 6x, 4x, 2x, 1x | Adjusts resolution chunky retro (6x = 320×180) to crisp high-density. |
 | **Snowfall Density** | Light (0.5x) to Blizzard (2.8x) | Number of snowflakes active simultaneously. |
+| **Snowflake Scale** | 1x (Native 1080p), 2x, 3x, 4x, 6x (Retro - Default), 8x | Independently scales snowflake resolution canvas while keeping scene/sprite pixel scale. |
 | **Drift Piling Speed** | Off (0x), Slow (0.5x), Normal (1.0x), Fast (2.0x), Blizzard (3.5x) | Rate of snow bank accumulation at the bottom. |
 | **Max Pile Height** | 15%, 25%, 35%, 50% Screen | Maximum height the snow mound is allowed to reach. |
 | **Wind Speed** | Calm (0), Gentle (4), Brisk (8), Gale (14) | Horizontal drift force applied to snowflakes. |
@@ -135,12 +138,12 @@ All settings can be customized from the **on-screen HUD** (<kbd>H</kbd>) or by *
 
 ## Controls Summary
 
-- **Toggle HUD Settings**: Press <kbd>H</kbd>
+- **Toggle HUD Settings**: Press <kbd>H</kbd> (in Windowed Mode)
+- **Context Menu & Controls**: Right-click the System Tray icon (available anytime in both Desktop & Windowed modes)
 - **Destroy Snowman**: Left-click on any completed snowman
 - **Carve Snow**: Click or drag mouse through the bottom snow mound
 - **Mouse Sparkles**: Left-click anywhere on the desktop
-- **Context Menu**: Right-click the System Tray icon
-- **Quit**: Right-click the System Tray icon -> **Quit LiveWP**
+- **Quit**: Right-click the System Tray icon -> **Quit Interactive Wallpaper**
 
 ---
 

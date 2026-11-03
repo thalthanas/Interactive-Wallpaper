@@ -22,6 +22,7 @@ export function setupTray({
   musicPlaying = false,
   musicVolume = 75,
   villageEnabled = false,
+  snowScale = 6,
   onToggleMode,
   onSetScale,
   onSettingChange,
@@ -34,7 +35,7 @@ export function setupTray({
   const icon = nativeImage.createFromPath(iconPath);
 
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
-  tray.setToolTip('LiveWP - Pixel Snow Live Wallpaper');
+  tray.setToolTip('Interactive Wallpaper - Pixel Snow Live Wallpaper');
 
   function updateMenu(state = {}) {
     const mode = state.currentMode ?? currentMode;
@@ -49,10 +50,11 @@ export function setupTray({
     const music = state.musicPlaying ?? musicPlaying;
     const vol = state.musicVolume ?? musicVolume;
     const village = state.villageEnabled ?? villageEnabled;
+    const sScale = state.snowScale ?? snowScale;
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'LiveWP (Pixel Snow)',
+        label: 'Interactive Wallpaper (Pixel Snow)',
         enabled: false,
       },
       { type: 'separator' },
@@ -133,6 +135,47 @@ export function setupTray({
                 type: 'radio',
                 checked: Math.abs(d - 2.8) < 0.2,
                 click: () => onSettingChange('density', 2.8),
+              },
+            ],
+          },
+          {
+            label: 'Snowflake Scale',
+            submenu: [
+              {
+                label: '1x (Fine - Native 1080p)',
+                type: 'radio',
+                checked: sScale === 1,
+                click: () => onSettingChange('snowScale', 1),
+              },
+              {
+                label: '2x (Small)',
+                type: 'radio',
+                checked: sScale === 2,
+                click: () => onSettingChange('snowScale', 2),
+              },
+              {
+                label: '3x (Medium-Small)',
+                type: 'radio',
+                checked: sScale === 3,
+                click: () => onSettingChange('snowScale', 3),
+              },
+              {
+                label: '4x (Medium)',
+                type: 'radio',
+                checked: sScale === 4,
+                click: () => onSettingChange('snowScale', 4),
+              },
+              {
+                label: '6x (Retro - Default)',
+                type: 'radio',
+                checked: sScale === 6,
+                click: () => onSettingChange('snowScale', 6),
+              },
+              {
+                label: '8x (Extra Chunky)',
+                type: 'radio',
+                checked: sScale === 8,
+                click: () => onSettingChange('snowScale', 8),
               },
             ],
           },
@@ -353,7 +396,7 @@ export function setupTray({
       },
       { type: 'separator' },
       {
-        label: 'Quit LiveWP',
+        label: 'Quit Interactive Wallpaper',
         click: () => onQuit(),
       },
     ]);

@@ -14,8 +14,9 @@ html, body {
   color: #e2e8f0;
 }
 
-/* Fullscreen Pixel Canvas */
-#wallpaper-canvas {
+/* Fullscreen Pixel Canvases */
+#wallpaper-canvas,
+#snow-canvas {
   position: absolute;
   top: 0;
   left: 0;
@@ -26,7 +27,16 @@ html, body {
   image-rendering: -webkit-crisp-edges;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+}
+
+#wallpaper-canvas {
   pointer-events: auto;
+  z-index: 1;
+}
+
+#snow-canvas {
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* Background YouTube Audio Player (alive for audio, hidden visually) */
