@@ -1,4 +1,6 @@
 import { app, BrowserWindow, screen, ipcMain, session } from 'electron';
+import http from 'http';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { wallpaper } from './wallpaper.js';
@@ -31,6 +33,49 @@ let santaEnabled = true;
 let santaFreq = 60;
 let musicPlaying = false;
 let musicVolume = 75;
+
+// Local HTTP Server to serve renderer over standard http origin (required for YouTube embedded audio)
+const mimeTypes = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json',
+};
+
+let localServer = null;
+let localPort = 0;
+
+function startLocalServer() {
+  return new Promise((resolve) => {
+    localServer = http.createServer((req, res) => {
+      let reqPath = req.url.split('?')[0];
+      if (reqPath === '/' || reqPath === '') reqPath = '/renderer/index.html';
+      else if (!reqPath.startsWith('/renderer') && !reqPath.startsWith('/pixelfx')) {
+        reqPath = '/renderer' + reqPath;
+      }
+      const filePath = path.join(__dirname, '..', reqPath);
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const ext = path.extname(filePath);
+        res.writeHead(200, {
+          'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+          'Access-Control-Allow-Origin': '*',
+        });
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        res.writeHead(404);
+        res.end('Not Found');
+      }
+    });
+
+    localServer.listen(0, '127.0.0.1', () => {
+      localPort = localServer.address().port;
+      resolve(localPort);
+    });
+  });
+}
 
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock();
@@ -73,14 +118,7 @@ function sendTaskbarInsets() {
 }
 
 async function createWindow() {
-  // Ensure YouTube requests pass valid Referer / Origin headers
-  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    if (details.url.includes('youtube.com') || details.url.includes('youtube-nocookie.com')) {
-      details.requestHeaders['Referer'] = 'https://www.youtube.com/';
-      details.requestHeaders['Origin'] = 'https://www.youtube.com';
-    }
-    callback({ requestHeaders: details.requestHeaders });
-  });
+  await startLocalServer();
 
   // Grant audio and media permissions unconditionally
   session.defaultSession.setPermissionCheckHandler(() => true);
@@ -110,7 +148,7 @@ async function createWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  mainWindow.loadURL(`http://127.0.0.1:${localPort}/index.html`);
 
   mainWindow.webContents.on('console-message', (event) => {
     console.log('[Renderer]', event.message || event);
@@ -251,6 +289,9 @@ function updateTray() {
 }
 
 function cleanup() {
+  if (localServer) {
+    try { localServer.close(); } catch {}
+  }
   wallpaper.stopMouseTracking();
   if (mainWindow && !mainWindow.isDestroyed()) {
     wallpaper.detach(mainWindow, { x: 0, y: 0, width: 100, height: 100 });

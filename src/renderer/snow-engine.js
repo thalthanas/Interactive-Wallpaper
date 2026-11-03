@@ -144,6 +144,13 @@ export class SnowEngine {
     this.builderTargetX = Math.floor(this.virtualW * 0.5);
     this.child1.x = -20;
     this.child2.x = this.virtualW + 20;
+
+    // Cleanly reset active build on scale change so new children spawn within new visible bounds
+    if (this.builderState !== 'WAITING') {
+      this.builderState = 'WAITING';
+      this.builderCooldown = 4;
+      this.pendingSnowmanConfig = null;
+    }
   }
 
   initDrift(clearOnly = false) {
@@ -331,33 +338,73 @@ export class SnowEngine {
     const minX = taskbarLeft + 28;
     const maxX = W - taskbarRight - 28;
 
-    const center = Math.floor(W * 0.5);
-    const hasCenter = this.snowmen.some((s) => Math.abs(s.x - center) < 32);
+    if (minX >= maxX) return Math.floor(W * 0.5);
 
-    // If center is empty, prefer center
+    // Only consider existing snowmen that are VISIBLE within the current screen bounds!
+    // (Snowmen built at a previous scale that are now offscreen will not block visible spots)
+    const visibleSnowmen = this.snowmen
+      .filter((s) => s.x >= minX - 10 && s.x <= maxX + 10)
+      .map((s) => s.x)
+      .sort((a, b) => a - b);
+
+    const minClearance = 36; // clearance between snowmen
+
+    // 1. If center is within visible bounds and vacant, build at center first!
+    const center = Math.floor(W * 0.5);
+    const hasCenter = visibleSnowmen.some((sx) => Math.abs(sx - center) < minClearance);
     if (!hasCenter && center >= minX && center <= maxX) {
       return center;
     }
 
-    // Try candidate spots across screen
-    const candidates = [
-      Math.floor(W * 0.28),
-      Math.floor(W * 0.72),
-      Math.floor(W * 0.40),
-      Math.floor(W * 0.60),
-      Math.floor(W * 0.18),
-      Math.floor(W * 0.82),
-    ];
+    // 2. Dynamically sample spots across the entire visible width
+    const step = 22;
+    const validSpots = [];
 
-    // Filter spots with clearance >= 36px from any existing snowman
-    const valid = candidates.filter((cx) => {
-      if (cx < minX || cx > maxX) return false;
-      return !this.snowmen.some((s) => Math.abs(s.x - cx) < 36);
-    });
-
-    if (valid.length > 0) {
-      return valid[Math.floor(Math.random() * valid.length)];
+    for (let x = minX; x <= maxX; x += step) {
+      const isClear = !visibleSnowmen.some((sx) => Math.abs(sx - x) < minClearance);
+      if (isClear) {
+        const drift = this.driftHeights ? this.driftHeights[x] || 0 : 0;
+        validSpots.push({ x, drift });
+      }
     }
+
+    if (validSpots.length > 0) {
+      // Prefer spots with some snow pile, else any clear spot
+      const withSnow = validSpots.filter((s) => s.drift >= 2);
+      const pool = withSnow.length > 0 ? withSnow : validSpots;
+      return pool[Math.floor(Math.random() * pool.length)].x;
+    }
+
+    // 3. Fallback: widest gap between visible snowmen
+    if (visibleSnowmen.length > 0) {
+      let maxGap = 0;
+      let bestX = null;
+
+      const leftGap = visibleSnowmen[0] - minX;
+      if (leftGap > maxGap) {
+        maxGap = leftGap;
+        bestX = Math.floor((minX + visibleSnowmen[0]) * 0.5);
+      }
+
+      for (let i = 0; i < visibleSnowmen.length - 1; i++) {
+        const gap = visibleSnowmen[i + 1] - visibleSnowmen[i];
+        if (gap > maxGap) {
+          maxGap = gap;
+          bestX = Math.floor((visibleSnowmen[i] + visibleSnowmen[i + 1]) * 0.5);
+        }
+      }
+
+      const rightGap = maxX - visibleSnowmen[visibleSnowmen.length - 1];
+      if (rightGap > maxGap) {
+        maxGap = rightGap;
+        bestX = Math.floor((visibleSnowmen[visibleSnowmen.length - 1] + maxX) * 0.5);
+      }
+
+      if (bestX !== null && maxGap >= minClearance) {
+        return bestX;
+      }
+    }
+
     return null;
   }
 
@@ -373,9 +420,13 @@ export class SnowEngine {
     this.child1.x = taskbarLeft - 18;
     this.child2.x = this.virtualW - taskbarRight + 18;
 
-    // Pick new outfits for this build
-    this.child1.outfit = CHILD_OUTFITS[Math.floor(Math.random() * CHILD_OUTFITS.length)];
-    this.child2.outfit = CHILD_OUTFITS[Math.floor(Math.random() * CHILD_OUTFITS.length)];
+    // Guarantee that Child 1 and Child 2 wear distinctly different colored clothing!
+    const idx1 = Math.floor(Math.random() * CHILD_OUTFITS.length);
+    let idx2 = Math.floor(Math.random() * (CHILD_OUTFITS.length - 1));
+    if (idx2 >= idx1) idx2++;
+
+    this.child1.outfit = CHILD_OUTFITS[idx1];
+    this.child2.outfit = CHILD_OUTFITS[idx2];
 
     // Randomize snowman appearance: scale (0.8x to 1.25x), hat style, scarf
     const hatChoice = HAT_COLORS[Math.floor(Math.random() * HAT_COLORS.length)];

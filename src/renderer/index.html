@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://www.youtube.com https://www.youtube-nocookie.com https://*.ytimg.com https://*.googlevideo.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' http://127.0.0.1:* https://www.youtube.com https://www.youtube-nocookie.com https://*.ytimg.com https://*.googlevideo.com; frame-src http://127.0.0.1:* https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LiveWP - Pixel Snow Live Wallpaper</title>
   <link rel="stylesheet" href="style.css">
@@ -101,15 +101,8 @@
           <span id="music-status" class="value-badge">Paused</span>
         </div>
         <!-- Embedded Visible Player in HUD -->
-        <div class="player-container" style="margin-top: 6px; border-radius: 6px; overflow: hidden;">
-          <iframe id="yt-player"
-            width="100%" height="150"
-            src="https://www.youtube.com/embed/S6ZCv6RwbNU?list=PLfP6i5T0-DkKnS-uYUXoFollNjUPMRzWJ&enablejsapi=1&autoplay=0&origin=https://www.youtube.com"
-            title="Christmas Music Playlist"
-            frameborder="0"
-            allow="autoplay; encrypted-media; picture-in-picture; clipboard-write"
-            referrerpolicy="strict-origin-when-cross-origin">
-          </iframe>
+        <div class="player-container" style="margin-top: 6px; border-radius: 6px; overflow: hidden; min-height: 150px; background: #000;">
+          <div id="yt-player-container"></div>
         </div>
         <div class="music-controls" style="margin-top: 8px;">
           <button id="btn-music-prev" class="btn btn-secondary btn-sm" title="Previous Track">⏮ Prev</button>
@@ -155,6 +148,17 @@
   <!-- Toast Notification -->
   <div id="toast" class="toast">LiveWP Ready</div>
 
+  <!-- YouTube Iframe API with guaranteed pre-init hook -->
+  <script>
+    window.__ytReady = false;
+    window.onYouTubeIframeAPIReady = function() {
+      window.__ytReady = true;
+      if (typeof window.__initYtPlayer === 'function') {
+        window.__initYtPlayer();
+      }
+    };
+  </script>
+  <script src="https://www.youtube.com/iframe_api"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

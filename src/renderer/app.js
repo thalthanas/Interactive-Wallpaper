@@ -95,35 +95,77 @@ function updateModeUI(mode) {
   }
 }
 
-// YouTube Player Commands
-function sendYtCommand(func, args = []) {
-  if (ytIframe && ytIframe.contentWindow) {
-    const payload = JSON.stringify({
-      event: 'command',
-      func: func,
-      args: Array.isArray(args) ? args : [args],
-    });
-    ytIframe.contentWindow.postMessage(payload, '*');
-  }
+// YouTube Player State
+let ytPlayer = null;
+let isPlayerReady = false;
+let pendingPlay = false;
+
+function initYtPlayer() {
+  if (ytPlayer) return;
+  ytPlayer = new YT.Player('yt-player-container', {
+    height: '150',
+    width: '100%',
+    videoId: 'S6ZCv6RwbNU',
+    playerVars: {
+      listType: 'playlist',
+      list: 'PLfP6i5T0-DkKnS-uYUXoFollNjUPMRzWJ',
+      autoplay: 0,
+      controls: 1,
+      rel: 0,
+      modestbranding: 1,
+      playsinline: 1,
+      origin: window.location.origin,
+    },
+    events: {
+      onReady: () => {
+        isPlayerReady = true;
+        ytPlayer.setVolume(currentVolume);
+        ytPlayer.unMute();
+        if (pendingPlay) {
+          pendingPlay = false;
+          ytPlayer.playVideo();
+        }
+      },
+      onStateChange: (event) => {
+        if (event.data === 1) {
+          isMusicPlaying = true;
+          btnMusicPlay.textContent = '⏸ Pause';
+          musicStatus.textContent = 'Playing 🎵';
+        } else if (event.data === 2) {
+          isMusicPlaying = false;
+          btnMusicPlay.textContent = '▶ Play';
+          musicStatus.textContent = 'Paused';
+        }
+        if (window.livewp) {
+          window.livewp.notifySetting('musicPlaying', isMusicPlaying);
+        }
+      },
+      onError: (event) => {
+        console.error('YouTube player error:', event.data);
+      },
+    },
+  });
+}
+
+window.__initYtPlayer = initYtPlayer;
+if (window.__ytReady || (window.YT && window.YT.Player)) {
+  initYtPlayer();
 }
 
 function toggleMusicPlay() {
-  isMusicPlaying = !isMusicPlaying;
-  if (isMusicPlaying) {
-    sendYtCommand('unMute', []);
-    sendYtCommand('setVolume', [currentVolume]);
-    sendYtCommand('playVideo', []);
-    btnMusicPlay.textContent = '⏸ Pause';
-    musicStatus.textContent = 'Playing 🎵';
+  if (!isPlayerReady || !ytPlayer) {
+    pendingPlay = !pendingPlay;
+    showToast('Connecting to Christmas playlist...');
+    return;
+  }
+  if (!isMusicPlaying) {
+    ytPlayer.unMute();
+    ytPlayer.setVolume(currentVolume);
+    ytPlayer.playVideo();
     showToast('Christmas Music: Playing');
   } else {
-    sendYtCommand('pauseVideo', []);
-    btnMusicPlay.textContent = '▶ Play';
-    musicStatus.textContent = 'Paused';
+    ytPlayer.pauseVideo();
     showToast('Christmas Music: Paused');
-  }
-  if (window.livewp) {
-    window.livewp.notifySetting('musicPlaying', isMusicPlaying);
   }
 }
 
@@ -131,11 +173,10 @@ function setVolume(vol) {
   currentVolume = vol;
   sliderVolume.value = vol;
   labelVolume.textContent = `${vol}%`;
-  sendYtCommand('setVolume', [vol]);
-  if (vol === 0) {
-    sendYtCommand('mute', []);
-  } else {
-    sendYtCommand('unMute', []);
+  if (ytPlayer && isPlayerReady) {
+    ytPlayer.setVolume(vol);
+    if (vol === 0) ytPlayer.mute();
+    else ytPlayer.unMute();
   }
 }
 
@@ -224,48 +265,23 @@ function setupEvents() {
   // Music Player Controls
   btnMusicPlay.addEventListener('click', toggleMusicPlay);
   btnMusicNext.addEventListener('click', () => {
-    sendYtCommand('nextVideo', []);
-    sendYtCommand('unMute', []);
-    sendYtCommand('setVolume', [currentVolume]);
-    showToast('Playing next song 🎵');
+    if (ytPlayer && isPlayerReady) {
+      ytPlayer.nextVideo();
+      ytPlayer.unMute();
+      ytPlayer.setVolume(currentVolume);
+      showToast('Playing next song 🎵');
+    }
   });
   btnMusicPrev.addEventListener('click', () => {
-    sendYtCommand('previousVideo', []);
-    sendYtCommand('unMute', []);
-    sendYtCommand('setVolume', [currentVolume]);
-    showToast('Playing previous song 🎵');
+    if (ytPlayer && isPlayerReady) {
+      ytPlayer.previousVideo();
+      ytPlayer.unMute();
+      ytPlayer.setVolume(currentVolume);
+      showToast('Playing previous song 🎵');
+    }
   });
   sliderVolume.addEventListener('input', (e) => {
     setVolume(parseInt(e.target.value, 10));
-  });
-
-  // YouTube iframe handshake and state listener
-  if (ytIframe) {
-    ytIframe.addEventListener('load', () => {
-      ytIframe.contentWindow?.postMessage(JSON.stringify({ event: 'listening' }), '*');
-      sendYtCommand('setVolume', [currentVolume]);
-      sendYtCommand('unMute', []);
-    });
-  }
-
-  window.addEventListener('message', (e) => {
-    try {
-      const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-      if (!data) return;
-      if (data.event === 'onStateChange') {
-        if (data.info === 1) {
-          isMusicPlaying = true;
-          btnMusicPlay.textContent = '⏸ Pause';
-          musicStatus.textContent = 'Playing 🎵';
-        } else if (data.info === 2) {
-          isMusicPlaying = false;
-          btnMusicPlay.textContent = '▶ Play';
-          musicStatus.textContent = 'Paused';
-        }
-      } else if (data.event === 'initialDelivery') {
-        sendYtCommand('setVolume', [currentVolume]);
-      }
-    } catch {}
   });
 
   // Reset Drift
@@ -383,13 +399,17 @@ function setupEvents() {
         } else if (data.value === 'pause') {
           if (isMusicPlaying) toggleMusicPlay();
         } else if (data.value === 'next') {
-          sendYtCommand('nextVideo', []);
-          sendYtCommand('unMute', []);
-          sendYtCommand('setVolume', [currentVolume]);
+          if (ytPlayer && isPlayerReady) {
+            ytPlayer.nextVideo();
+            ytPlayer.unMute();
+            ytPlayer.setVolume(currentVolume);
+          }
         } else if (data.value === 'prev') {
-          sendYtCommand('previousVideo', []);
-          sendYtCommand('unMute', []);
-          sendYtCommand('setVolume', [currentVolume]);
+          if (ytPlayer && isPlayerReady) {
+            ytPlayer.previousVideo();
+            ytPlayer.unMute();
+            ytPlayer.setVolume(currentVolume);
+          }
         } else if (typeof data.value === 'number') {
           setVolume(data.value);
         }
