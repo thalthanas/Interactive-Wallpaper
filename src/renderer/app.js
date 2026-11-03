@@ -40,14 +40,11 @@ const btnTogglePause = document.getElementById('btn-toggle-pause');
 const pauseText = document.getElementById('pause-text');
 const fpsCounter = document.getElementById('fps-counter');
 const resDisplay = document.getElementById('res-display');
-const toastEl = document.getElementById('toast');
-
 // Initialize Snow Engine
 const engine = new SnowEngine(canvas);
 
 let currentMode = 'wallpaper';
 let currentScale = 6;
-let toastTimeout = null;
 let isMusicPlaying = false;
 let currentVolume = 75;
 
@@ -56,13 +53,8 @@ let lastFrameTime = performance.now();
 let frameCount = 0;
 let lastFpsUpdate = performance.now();
 
-function showToast(msg) {
-  if (toastTimeout) clearTimeout(toastTimeout);
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  toastTimeout = setTimeout(() => {
-    toastEl.classList.remove('show');
-  }, 2400);
+function showToast(_msg) {
+  // Popups disabled per request
 }
 
 function updateScaleLabel(scale) {

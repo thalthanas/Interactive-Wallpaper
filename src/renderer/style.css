@@ -271,28 +271,3 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .hud-footer strong {
   color: #cbd5e1;
 }
-
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(50px);
-  background: rgba(19, 26, 48, 0.95);
-  border: 1px solid rgba(135, 162, 207, 0.4);
-  color: #ffffff;
-  padding: 8px 18px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-  opacity: 0;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  z-index: 200;
-}
-
-.toast.show {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-}

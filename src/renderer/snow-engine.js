@@ -98,7 +98,7 @@ export class SnowEngine {
     this.nextSnowmanId = 1;
 
     // Children Builder Team State
-    this.builderState = 'WAITING'; // 'WAITING' | 'WALKING_IN' | 'BUILDING' | 'CELEBRATING' | 'WALKING_OUT'
+    this.builderState = 'WAITING'; // 'WAITING' | 'WALKING_IN' | 'BUILDING' | 'ADMIRING' | 'WALKING_OUT'
     this.builderTargetX = 160;
     this.builderTimer = 0;
     this.builderStage = 0; // 1 = base, 2 = torso, 3 = head & details
@@ -661,7 +661,7 @@ export class SnowEngine {
         this.builderStage = 3; // Head & hat
       } else if (this.builderTimer > 5.8 && this.builderStage === 3) {
         // Complete build WITHOUT particle burst!
-        this.builderState = 'CELEBRATING';
+        this.builderState = 'ADMIRING';
         this.builderTimer = 0;
 
         // Add to permanent snowmen collection!
@@ -669,9 +669,9 @@ export class SnowEngine {
           this.snowmen.push({ ...this.pendingSnowmanConfig, bounds: null });
         }
       }
-    } else if (this.builderState === 'CELEBRATING') {
+    } else if (this.builderState === 'ADMIRING') {
       this.builderTimer += dt;
-      if (this.builderTimer >= 2.0) {
+      if (this.builderTimer >= 1.0) {
         // Turn around and leave!
         this.builderState = 'WALKING_OUT';
       }
@@ -707,14 +707,19 @@ export class SnowEngine {
       this.santaX += this.santaSpeed * this.santaDir * dt;
       this.santaY += Math.sin(this.time * 2.5) * 0.4;
 
-      if (Math.random() < 0.6) {
+      // Yellow sparkling stardust starts directly from the rear tip of the yellow runner under the sleigh
+      const runnerEndX = this.santaX - this.santaDir * 8;
+      const runnerEndY = this.santaY + 4;
+
+      if (Math.random() < 0.75) {
         this.santaTrail.push({
-          x: this.santaX - this.santaDir * 18 + (Math.random() - 0.5) * 4,
-          y: this.santaY + (Math.random() - 0.5) * 4,
-          vy: Math.random() * 8 + 3,
+          x: runnerEndX + (Math.random() - 0.5) * 1.5,
+          y: runnerEndY + (Math.random() - 0.5) * 1.2,
+          vx: -this.santaDir * (Math.random() * 8 + 4),
+          vy: Math.random() * 4 + 1,
           life: 0.8 + Math.random() * 0.5,
-          maxLife: 1.2,
-          color: Math.random() < 0.6 ? '#fbbf24' : '#ffffff',
+          maxLife: 1.3,
+          color: Math.random() < 0.75 ? '#fbbf24' : '#ffffff',
         });
       }
 
@@ -729,6 +734,7 @@ export class SnowEngine {
     for (let i = this.santaTrail.length - 1; i >= 0; i--) {
       const pt = this.santaTrail[i];
       pt.life -= dt;
+      pt.x += (pt.vx || 0) * dt;
       pt.y += pt.vy * dt;
       if (pt.life <= 0) {
         this.santaTrail.splice(i, 1);
@@ -1033,18 +1039,14 @@ export class SnowEngine {
     }
 
     // 2. Children
-    if (this.builderState === 'WALKING_IN' || this.builderState === 'BUILDING' || this.builderState === 'CELEBRATING' || this.builderState === 'WALKING_OUT') {
+    if (this.builderState === 'WALKING_IN' || this.builderState === 'BUILDING' || this.builderState === 'ADMIRING' || this.builderState === 'WALKING_OUT') {
       const c1x = Math.floor(this.child1.x);
       const c1y = Math.floor(baseY - (this.driftHeights ? this.driftHeights[Math.max(0, Math.min(this.virtualW - 1, c1x))] || 0 : 0));
       const c2x = Math.floor(this.child2.x);
       const c2y = Math.floor(baseY - (this.driftHeights ? this.driftHeights[Math.max(0, Math.min(this.virtualW - 1, c2x))] || 0 : 0));
 
-      const isCheering = this.builderState === 'CELEBRATING';
-      const cheerBob1 = isCheering ? Math.abs(Math.sin(this.time * 12)) * 3 : 0;
-      const cheerBob2 = isCheering ? Math.abs(Math.sin(this.time * 12 + 0.8)) * 3 : 0;
-
-      // FIX: Direction facing!
-      // When walking in or building: Child 1 faces RIGHT (dir = 1), Child 2 faces LEFT (dir = -1)
+      // Direction facing:
+      // When walking in or building or admiring: Child 1 faces RIGHT (dir = 1), Child 2 faces LEFT (dir = -1)
       // When walking out: Child 1 faces LEFT (dir = -1), Child 2 faces RIGHT (dir = 1)!
       const c1Dir = this.builderState === 'WALKING_OUT' ? -1 : 1;
       const c2Dir = this.builderState === 'WALKING_OUT' ? 1 : -1;
@@ -1053,26 +1055,26 @@ export class SnowEngine {
       this.drawChild(
         p,
         c1x,
-        c1y - cheerBob1,
+        c1y,
         hex(this.child1.outfit.coat),
         hex(this.child1.outfit.hat),
         hex(this.child1.outfit.scarf),
         this.child1.legPhase,
         c1Dir,
-        isCheering
+        false
       );
 
       // Child 2
       this.drawChild(
         p,
         c2x,
-        c2y - cheerBob2,
+        c2y,
         hex(this.child2.outfit.coat),
         hex(this.child2.outfit.hat),
         hex(this.child2.outfit.scarf),
         this.child2.legPhase,
         c2Dir,
-        isCheering
+        false
       );
     }
   }
