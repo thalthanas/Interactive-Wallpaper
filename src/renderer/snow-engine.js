@@ -118,6 +118,17 @@ export class SnowEngine {
     this.santaDir = 1; // 1: left-to-right, -1: right-to-left
     this.santaSpeed = 45;
     this.santaTrail = [];
+
+    // Background Village & Holiday Star Tree
+    this.starTreeEnabled = true;
+    this.villageHouses = [];
+    this.villageTrees = [];
+    this.villageSmoke = [];
+
+    // Yellow Snowplow / "Snowpillar" Machine
+    this.plowActive = false;
+    this.plowX = -60;
+    this.plowSpeed = 85;
   }
 
   setTaskbarInsets(insets) {
@@ -141,6 +152,9 @@ export class SnowEngine {
     // Populate snowflakes based on density
     this.initSnowflakes();
 
+    // Initialize background village & trees
+    this.initVillage();
+
     this.builderTargetX = Math.floor(this.virtualW * 0.5);
     this.child1.x = -20;
     this.child2.x = this.virtualW + 20;
@@ -162,10 +176,21 @@ export class SnowEngine {
     }
   }
 
-  clearDrift() {
-    if (this.driftHeights) {
-      this.driftHeights.fill(0);
+  clearDrift(instant = false) {
+    if (instant) {
+      if (this.driftHeights) {
+        this.driftHeights.fill(0);
+      }
+      return;
     }
+    // Trigger yellow snowplow clearing animation across the scene!
+    this.startSnowPlow();
+  }
+
+  startSnowPlow() {
+    this.plowActive = true;
+    this.plowX = -50;
+    this.plowSpeed = 85;
   }
 
   initSnowflakes() {
@@ -580,6 +605,12 @@ export class SnowEngine {
 
     // 6. Update Santa Sleigh Flight
     this.updateSanta(dt, W);
+
+    // 7. Update Background Village (blinking window lights & smoke wisps)
+    this.updateVillage(dt, baseY);
+
+    // 8. Update Yellow Snowplow Clearing Machine
+    this.updateSnowPlow(dt, baseY);
   }
 
   accumulateSnow(x, amount) {
@@ -770,7 +801,10 @@ export class SnowEngine {
       }
     }
 
-    // 4. Snow Drift (Bottom Snow Bank on top of taskbar)
+    // 3.5 Background Village & Pine Trees (Houses, snowy roofs, blinking lights, star tree)
+    this.renderBackgroundVillage(p, W, baseY, C);
+
+    // 4. Snow Drift (Bottom Snow Bank on top of taskbar - covers village as snow accumulates!)
     this.renderDrift(p, W, baseY, taskbarLeft, W - taskbarRight, C);
 
     // 5. Render All Completed Snowmen
@@ -778,6 +812,11 @@ export class SnowEngine {
 
     // 6. Render Children & In-Progress Snowman
     this.renderChildrenAndBuildingSnowman(p, baseY, C);
+
+    // 6.5 Yellow Snowplow Clearing Machine
+    if (this.plowActive) {
+      this.renderSnowPlow(p, baseY, C);
+    }
 
     // 7. Layer 1 (Mid Drifting Flakes)
     for (let i = 0; i < this.snowflakes.length; i++) {
@@ -1241,5 +1280,525 @@ export class SnowEngine {
     }
 
     p.add(rx, ry, C[5], 0.35 * alpha);
+  }
+
+  /* -------------------------------------------------------------
+   * Background Village & Holiday Star Tree
+   * ----------------------------------------------------------- */
+  initVillage() {
+    this.villageHouses = [];
+    this.villageTrees = [];
+    this.villageSmoke = [];
+
+    const W = this.virtualW;
+
+    // Distribute cottages across width, leaving a central corridor for the Holiday Star Tree
+    const houseConfigs = [
+      { relX: 0.11, w: 15, h: 10, roofH: 6, hasChimney: true, chimneySide: -1, wallColor: '#3d1d11', winCount: 2 },
+      { relX: 0.27, w: 13, h: 9,  roofH: 5, hasChimney: true, chimneySide: 1,  wallColor: '#2b231f', winCount: 1 },
+      { relX: 0.73, w: 14, h: 10, roofH: 6, hasChimney: true, chimneySide: 1,  wallColor: '#362218', winCount: 2 },
+      { relX: 0.89, w: 16, h: 11, roofH: 7, hasChimney: true, chimneySide: -1, wallColor: '#301c13', winCount: 2 },
+    ];
+
+    if (W > 400) {
+      houseConfigs.push(
+        { relX: 0.38, w: 13, h: 9, roofH: 5, hasChimney: false, chimneySide: 1, wallColor: '#292524', winCount: 1 },
+        { relX: 0.62, w: 14, h: 10, roofH: 6, hasChimney: true, chimneySide: -1, wallColor: '#3b1d11', winCount: 2 }
+      );
+    }
+
+    this.villageHouses = houseConfigs.map((cfg, i) => ({
+      ...cfg,
+      lightOn: i % 2 === 0, // initially some on, some off
+      lightTimer: 8 + (i * 6) % 14 + Math.random() * 8,
+      smokeTimer: Math.random() * 2,
+    }));
+
+    // Distribute small snow-covered pine trees along the village ridge
+    const treeRelPositions = [0.04, 0.18, 0.22, 0.34, 0.43, 0.57, 0.66, 0.80, 0.84, 0.96];
+    if (W > 400) {
+      treeRelPositions.push(0.31, 0.47, 0.53, 0.69);
+    }
+
+    this.villageTrees = treeRelPositions.map((relX, i) => ({
+      relX,
+      height: 12 + (i % 4) * 2, // 12px to 18px tall
+      width: 7 + (i % 3) * 2,   // 7px to 11px wide
+    }));
+  }
+
+  updateVillage(dt, baseY) {
+    const W = this.virtualW;
+    const villageGroundY = baseY - 6;
+
+    for (let i = 0; i < this.villageHouses.length; i++) {
+      const h = this.villageHouses[i];
+      h.lightTimer -= dt;
+      if (h.lightTimer <= 0) {
+        // Toggle house window light!
+        h.lightOn = !h.lightOn;
+        h.lightTimer = 10 + Math.random() * 22;
+      }
+
+      // Cozy chimney smoke wisp if chimney exists and light is on
+      if (h.hasChimney && h.lightOn) {
+        h.smokeTimer -= dt;
+        if (h.smokeTimer <= 0) {
+          h.smokeTimer = 1.4 + Math.random() * 1.6;
+          const hx = Math.round(h.relX * W);
+          const cx = hx + h.chimneySide * Math.floor(h.w * 0.3);
+          const cy = villageGroundY - (h.h + h.roofH + 2);
+          this.villageSmoke.push({
+            x: cx,
+            y: cy,
+            vx: (Math.random() - 0.5) * 2 + this.windBase * 0.18,
+            vy: -(Math.random() * 4 + 3),
+            life: 1.8 + Math.random() * 0.8,
+            maxLife: 2.6,
+          });
+        }
+      }
+    }
+
+    // Update chimney smoke wisps
+    for (let i = this.villageSmoke.length - 1; i >= 0; i--) {
+      const sm = this.villageSmoke[i];
+      sm.life -= dt;
+      sm.x += sm.vx * dt;
+      sm.y += sm.vy * dt;
+      if (sm.life <= 0) {
+        this.villageSmoke.splice(i, 1);
+      }
+    }
+  }
+
+  renderBackgroundVillage(p, W, baseY, C) {
+    const villageGroundY = baseY - 6;
+
+    // 1. Gentle distant snowy ridge / ground horizon behind the foreground snow drift
+    for (let x = 0; x < W; x++) {
+      const ridgeY = Math.round(villageGroundY + Math.sin(x * 0.04 + 1.2) * 1.5);
+      p.put(x, ridgeY, hex('#334155'), 0.85);
+      p.put(x, ridgeY + 1, hex('#1e293b'), 0.95);
+      for (let y = ridgeY + 2; y <= baseY + 2; y++) {
+        p.put(x, y, hex('#0f172a'));
+      }
+    }
+
+    // 2. Chimney smoke wisps drifting into sky
+    for (let i = 0; i < this.villageSmoke.length; i++) {
+      const sm = this.villageSmoke[i];
+      const a = (sm.life / sm.maxLife) * 0.45;
+      const rx = Math.round(sm.x);
+      const ry = Math.round(sm.y);
+      p.put(rx, ry, hex('#94a3b8'), a);
+      if (sm.life < sm.maxLife * 0.7) {
+        p.put(rx + 1, ry, hex('#cbd5e1'), a * 0.6);
+      }
+    }
+
+    // 3. Small Background Pine Trees
+    for (let i = 0; i < this.villageTrees.length; i++) {
+      const t = this.villageTrees[i];
+      const tx = Math.round(t.relX * W);
+      const ty = Math.round(villageGroundY + Math.sin(tx * 0.04 + 1.2) * 1.5);
+      this.drawPineTree(p, tx, ty, t.height, t.width);
+    }
+
+    // 4. Background Cottages
+    for (let i = 0; i < this.villageHouses.length; i++) {
+      const h = this.villageHouses[i];
+      const hx = Math.round(h.relX * W);
+      const hy = Math.round(villageGroundY + Math.sin(hx * 0.04 + 1.2) * 1.5);
+      this.drawCottage(p, hx, hy, h);
+    }
+
+    // 5. Big Holiday Pine Tree with Star (in the middle, toggleable from settings)
+    if (this.starTreeEnabled) {
+      const centerX = Math.floor(W * 0.5);
+      const centerY = Math.round(villageGroundY + Math.sin(centerX * 0.04 + 1.2) * 1.5);
+      this.drawBigStarTree(p, centerX, centerY, C);
+    }
+  }
+
+  drawCottage(p, x, groundY, h) {
+    const halfW = Math.floor(h.w * 0.5);
+    const wallTop = groundY - h.h;
+    const roofTop = wallTop - h.roofH;
+
+    // Chimney (behind roof)
+    if (h.hasChimney) {
+      const cx = x + h.chimneySide * Math.floor(h.w * 0.3);
+      for (let cy = roofTop - 3; cy <= wallTop; cy++) {
+        p.put(cx - 1, cy, hex('#475569'));
+        p.put(cx, cy, hex('#334155'));
+      }
+      p.put(cx - 1, roofTop - 4, WHITE);
+      p.put(cx, roofTop - 4, WHITE);
+      p.put(cx + 1, roofTop - 4, hex('#cbd5e1'));
+    }
+
+    // Walls (timber logs)
+    for (let y = wallTop; y <= groundY; y++) {
+      const isShadowRow = (y - wallTop) % 3 === 0;
+      const wallColor = isShadowRow ? hex('#1e293b') : hex(h.wallColor);
+      for (let dx = -halfW; dx <= halfW; dx++) {
+        p.put(x + dx, y, wallColor);
+      }
+    }
+
+    // Door in center or side
+    const doorW = 3;
+    const doorH = 5;
+    const doorX = x - (h.winCount === 1 ? halfW - 4 : 1);
+    for (let dy = 0; dy < doorH; dy++) {
+      for (let dx = 0; dx < doorW; dx++) {
+        p.put(doorX + dx, groundY - dy, hex('#1e293b'));
+      }
+    }
+
+    // Windows with dynamic warm amber light
+    const windowY = wallTop + 3;
+    const winColor = h.lightOn ? hex('#fef08a') : hex('#0f172a');
+    const winFrame = hex('#1e293b');
+
+    if (h.winCount === 1) {
+      const wx = x + halfW - 4;
+      p.put(wx, windowY, winColor);
+      p.put(wx + 1, windowY, winColor);
+      p.put(wx, windowY + 1, winColor);
+      p.put(wx + 1, windowY + 1, winColor);
+      p.put(wx - 1, windowY + 2, winFrame);
+      p.put(wx, windowY + 2, winFrame);
+      p.put(wx + 1, windowY + 2, winFrame);
+      p.put(wx + 2, windowY + 2, winFrame);
+
+      if (h.lightOn) {
+        p.add(wx, windowY, hex('#f59e0b'), 0.4);
+        p.add(wx + 1, windowY, hex('#f59e0b'), 0.4);
+      }
+    } else {
+      const leftWx = x - halfW + 2;
+      const rightWx = x + halfW - 3;
+      // Left window
+      p.put(leftWx, windowY, winColor);
+      p.put(leftWx + 1, windowY, winColor);
+      p.put(leftWx, windowY + 1, winColor);
+      p.put(leftWx + 1, windowY + 1, winColor);
+      // Right window
+      p.put(rightWx, windowY, winColor);
+      p.put(rightWx + 1, windowY, winColor);
+      p.put(rightWx, windowY + 1, winColor);
+      p.put(rightWx + 1, windowY + 1, winColor);
+
+      if (h.lightOn) {
+        p.add(leftWx, windowY, hex('#f59e0b'), 0.35);
+        p.add(rightWx, windowY, hex('#f59e0b'), 0.35);
+      }
+    }
+
+    // Gabled Roof with thick snow covering
+    const roofHalfW = halfW + 2;
+    for (let r = 0; r <= h.roofH; r++) {
+      const curY = wallTop - r;
+      const span = Math.round(roofHalfW * (1 - r / (h.roofH + 1)));
+      p.put(x - span - 1, curY, hex('#1e293b'));
+      p.put(x + span + 1, curY, hex('#1e293b'));
+
+      for (let dx = -span; dx <= span; dx++) {
+        if (r >= h.roofH - 1) {
+          p.put(x + dx, curY, WHITE);
+        } else if (r >= h.roofH - 2) {
+          p.put(x + dx, curY, hex('#e2e8f0'));
+        } else {
+          p.put(x + dx, curY, hex('#334155'));
+        }
+      }
+    }
+    // Snow overhang along the eaves
+    for (let dx = -roofHalfW; dx <= roofHalfW; dx++) {
+      p.put(x + dx, wallTop, hex('#e2e8f0'));
+    }
+  }
+
+  drawPineTree(p, x, groundY, height, width) {
+    const trunkH = Math.max(2, Math.floor(height * 0.2));
+    for (let y = groundY - trunkH; y <= groundY; y++) {
+      p.put(x, y, hex('#3b1d11'));
+    }
+
+    const foliageH = height - trunkH;
+    const tiers = 3;
+    const tierH = Math.floor(foliageH / tiers);
+
+    for (let t = 0; t < tiers; t++) {
+      const tierBaseY = groundY - trunkH - t * tierH;
+      const tierTopY = tierBaseY - tierH;
+      const tierMaxW = Math.max(2, Math.floor(width * (1 - t * 0.28)));
+
+      for (let y = tierBaseY; y >= tierTopY; y--) {
+        const progress = (tierBaseY - y) / (tierH || 1);
+        const curW = Math.max(1, Math.round(tierMaxW * (1 - progress * 0.7)));
+
+        for (let dx = -curW; dx <= curW; dx++) {
+          const isSnowTop = (y === tierTopY || (progress > 0.6 && Math.abs(dx) <= 1));
+          if (isSnowTop) {
+            p.put(x + dx, y, WHITE);
+          } else if (progress > 0.4) {
+            p.put(x + dx, y, hex('#cbd5e1'));
+          } else {
+            p.put(x + dx, y, hex('#14532d'));
+          }
+        }
+      }
+    }
+    p.put(x, groundY - height, WHITE);
+  }
+
+  drawBigStarTree(p, x, groundY, C) {
+    // Trunk
+    for (let dy = 0; dy <= 3; dy++) {
+      p.put(x - 1, groundY - dy, hex('#451a03'));
+      p.put(x, groundY - dy, hex('#3b1d11'));
+      p.put(x + 1, groundY - dy, hex('#451a03'));
+    }
+
+    // 4 Distinct Tiers of lush pine foliage
+    const tiers = [
+      { baseY: groundY - 3,  topY: groundY - 9,  w: 10 },
+      { baseY: groundY - 8,  topY: groundY - 15, w: 8  },
+      { baseY: groundY - 14, topY: groundY - 21, w: 6  },
+      { baseY: groundY - 20, topY: groundY - 26, w: 3  },
+    ];
+
+    for (let t = 0; t < tiers.length; t++) {
+      const { baseY: bY, topY: tY, w } = tiers[t];
+      for (let y = bY; y >= tY; y--) {
+        const k = (bY - y) / (bY - tY || 1);
+        const curW = Math.max(1, Math.round(w * (1 - k * 0.65)));
+
+        for (let dx = -curW; dx <= curW; dx++) {
+          if (y === tY || (k > 0.65 && Math.abs(dx) <= curW - 1)) {
+            p.put(x + dx, y, WHITE);
+          } else if (k > 0.45) {
+            p.put(x + dx, y, hex('#cbd5e1'));
+          } else {
+            const green = dx % 2 === 0 ? '#15803d' : '#14532d';
+            p.put(x + dx, y, hex(green));
+          }
+        }
+      }
+    }
+
+    // Festive Twinkling Fairy Lights scattered across the tree
+    const fairyLights = [
+      { dx: -7, dy: -5,  color: '#ef4444', phase: 0 },
+      { dx:  6, dy: -6,  color: '#fbbf24', phase: 1.2 },
+      { dx: -1, dy: -7,  color: '#38bdf8', phase: 2.1 },
+      { dx: -5, dy: -11, color: '#4ade80', phase: 3.0 },
+      { dx:  4, dy: -12, color: '#f43f5e', phase: 4.2 },
+      { dx:  0, dy: -13, color: '#fbbf24', phase: 0.8 },
+      { dx: -3, dy: -17, color: '#38bdf8', phase: 1.7 },
+      { dx:  3, dy: -18, color: '#ef4444', phase: 2.9 },
+      { dx:  0, dy: -23, color: '#4ade80', phase: 3.8 },
+    ];
+
+    for (let i = 0; i < fairyLights.length; i++) {
+      const fl = fairyLights[i];
+      const brightness = 0.5 + 0.5 * Math.sin(this.time * 3 + fl.phase);
+      if (brightness > 0.25) {
+        p.put(x + fl.dx, groundY + fl.dy, hex(fl.color), brightness);
+        p.add(x + fl.dx, groundY + fl.dy, hex(fl.color), 0.3 * brightness);
+      }
+    }
+
+    // THE BIG GOLDEN STAR ON TOP!
+    const starY = groundY - 27;
+    const pulse = 0.65 + 0.35 * Math.sin(this.time * 4);
+
+    // Radiant core & points
+    p.put(x, starY, WHITE);
+    p.put(x - 1, starY, hex('#fef08a'));
+    p.put(x + 1, starY, hex('#fef08a'));
+    p.put(x, starY - 1, hex('#fef08a'));
+    p.put(x, starY + 1, hex('#fef08a'));
+
+    // Star 4 Ray Tips
+    p.put(x - 2, starY, hex('#facc15'));
+    p.put(x + 2, starY, hex('#facc15'));
+    p.put(x, starY - 2, hex('#facc15'));
+    p.put(x, starY + 2, hex('#facc15'));
+
+    // Diagonal accents
+    p.put(x - 1, starY - 1, hex('#fbbf24'));
+    p.put(x + 1, starY - 1, hex('#fbbf24'));
+    p.put(x - 1, starY + 1, hex('#fbbf24'));
+    p.put(x + 1, starY + 1, hex('#fbbf24'));
+
+    // Star Golden Glowing Halo
+    p.add(x, starY, hex('#fbbf24'), 0.7 * pulse);
+    p.add(x, starY - 1, hex('#f59e0b'), 0.4 * pulse);
+    p.add(x, starY + 1, hex('#f59e0b'), 0.4 * pulse);
+    p.add(x - 1, starY, hex('#f59e0b'), 0.4 * pulse);
+    p.add(x + 1, starY, hex('#f59e0b'), 0.4 * pulse);
+  }
+
+  /* -------------------------------------------------------------
+   * Yellow Snowplow / "Snowpillar" Machine
+   * ----------------------------------------------------------- */
+  updateSnowPlow(dt, baseY) {
+    if (!this.plowActive) return;
+
+    this.plowX += this.plowSpeed * dt;
+    const bladeFrontX = Math.floor(this.plowX + 24);
+
+    // Smoothly clear snow behind the plow's blade
+    if (this.driftHeights) {
+      const clearMax = Math.min(this.virtualW - 1, bladeFrontX);
+      for (let x = 0; x <= clearMax; x++) {
+        if (this.driftHeights[x] > 0) {
+          // Spray snow particles from blade curl!
+          if (x >= bladeFrontX - 5 && Math.random() < 0.45) {
+            this.interactiveParticles.push({
+              x: bladeFrontX + (Math.random() - 0.5) * 2,
+              y: baseY - Math.min(this.driftHeights[x], 10) - Math.random() * 6,
+              vx: Math.random() * 28 + 14,
+              vy: -(Math.random() * 22 + 8),
+              life: 0.5 + Math.random() * 0.4,
+              maxLife: 0.8,
+              color: Math.random() < 0.75 ? '#ffffff' : '#cbd5e1',
+            });
+          }
+          this.driftHeights[x] = 0; // snow cleared!
+        }
+      }
+    }
+
+    // When the plow has fully driven across the screen to the right:
+    if (this.plowX > this.virtualW + 35) {
+      this.plowActive = false;
+      this.clearDrift(true); // guarantee complete cleanup
+    }
+  }
+
+  renderSnowPlow(p, baseY, C) {
+    const px = Math.round(this.plowX);
+    const py = baseY;
+
+    // 1. Caterpillar Treads / Tracks along ground
+    for (let x = px - 6; x <= px + 14; x++) {
+      p.put(x, py, hex('#0f172a'));      // ground contact rubber
+      p.put(x, py - 3, hex('#0f172a'));  // top tread return
+    }
+    // Tread end caps
+    p.put(px - 7, py - 1, hex('#0f172a'));
+    p.put(px - 7, py - 2, hex('#0f172a'));
+    p.put(px + 15, py - 1, hex('#0f172a'));
+    p.put(px + 15, py - 2, hex('#0f172a'));
+
+    // Track rollers / wheels (4 bogies)
+    const wheelXs = [px - 4, px + 1, px + 6, px + 11];
+    for (let i = 0; i < wheelXs.length; i++) {
+      const wx = wheelXs[i];
+      p.put(wx, py - 1, hex('#64748b'));
+      p.put(wx + 1, py - 1, hex('#64748b'));
+      p.put(wx, py - 2, hex('#475569'));
+      p.put(wx + 1, py - 2, hex('#475569'));
+    }
+
+    // 2. Heavy Yellow Chassis & Engine Hood
+    for (let y = py - 8; y <= py - 4; y++) {
+      for (let x = px - 6; x <= px + 5; x++) {
+        const isHighlight = y === py - 8;
+        const isShadow = y === py - 4;
+        const color = isHighlight ? '#facc15' : isShadow ? '#ca8a04' : '#eab308';
+        p.put(x, y, hex(color));
+      }
+    }
+    // Engine cooling vents at rear
+    p.put(px - 5, py - 6, hex('#854d0e'));
+    p.put(px - 5, py - 5, hex('#854d0e'));
+
+    // Exhaust pipe
+    for (let y = py - 12; y <= py - 9; y++) {
+      p.put(px - 3, y, hex('#1e293b'));
+    }
+    p.put(px - 4, py - 13, hex('#334155'));
+    p.put(px - 3, py - 13, hex('#334155'));
+    if (Math.sin(this.time * 8) > 0.2) {
+      p.put(px - 5, py - 14, hex('#94a3b8'), 0.5);
+    }
+
+    // 3. Driver Cab
+    for (let y = py - 14; y <= py - 9; y++) {
+      for (let x = px + 1; x <= px + 11; x++) {
+        p.put(x, y, hex('#eab308'));
+      }
+    }
+    // Cab Roof
+    for (let x = px; x <= px + 12; x++) {
+      p.put(x, py - 15, hex('#facc15'));
+    }
+
+    // Windows
+    for (let y = py - 13; y <= py - 10; y++) {
+      for (let x = px + 3; x <= px + 7; x++) {
+        p.put(x, y, hex('#7dd3fc'));
+      }
+    }
+    for (let y = py - 13; y <= py - 10; y++) {
+      p.put(px + 9, y, hex('#38bdf8'));
+      p.put(px + 10, y, hex('#0284c7'));
+    }
+    p.put(px + 5, py - 11, hex('#0f172a'));
+    p.put(px + 5, py - 12, hex('#0f172a'));
+
+    // 4. Amber Hazard Warning Light (Roof beacon)
+    const hazardOn = Math.sin(this.time * 22) > 0;
+    p.put(px + 6, py - 16, hex('#475569')); // mount stem
+    if (hazardOn) {
+      p.put(px + 6, py - 17, WHITE); // bright flash core
+      p.put(px + 5, py - 17, hex('#fbbf24'));
+      p.put(px + 7, py - 17, hex('#fbbf24'));
+      p.put(px + 6, py - 18, hex('#f59e0b'));
+
+      // Ambient hazard glow halo
+      p.add(px + 6, py - 17, hex('#f59e0b'), 0.85);
+      p.add(px + 6, py - 18, hex('#fbbf24'), 0.5);
+      p.add(px + 6, py - 16, hex('#f59e0b'), 0.4);
+    } else {
+      p.put(px + 6, py - 17, hex('#b45309')); // dark amber bulb
+      p.put(px + 5, py - 17, hex('#78350f'));
+      p.put(px + 7, py - 17, hex('#78350f'));
+    }
+
+    // 5. Heavy Steel Front Snowplow Blade
+    for (let x = px + 12; x <= px + 16; x++) {
+      p.put(x, py - 5, hex('#ca8a04'));
+      p.put(x, py - 4, hex('#1e293b'));
+    }
+
+    // Scraper edge along ground
+    for (let x = px + 17; x <= px + 24; x++) {
+      p.put(x, py, hex('#334155'));
+      p.put(x, py - 1, hex('#475569'));
+    }
+    // Curved blade scoop
+    for (let y = py - 8; y <= py - 2; y++) {
+      const progress = (py - 2 - y) / 6;
+      const bx = px + 18 + Math.round(progress * 5);
+      p.put(bx - 1, y, hex('#64748b'));
+      p.put(bx, y, hex('#94a3b8'));
+      p.put(bx + 1, y, hex('#cbd5e1')); // steel blade front lip
+    }
+    p.put(px + 23, py - 9, hex('#cbd5e1'));
+    p.put(px + 24, py - 9, WHITE); // snow curling over top
+    p.put(px + 23, py - 8, WHITE);
+
+    // 6. Front Headlight & Beam
+    p.put(px + 15, py - 7, WHITE);
+    p.add(px + 17, py - 7, hex('#fef08a'), 0.6);
+    p.add(px + 19, py - 6, hex('#fef08a'), 0.4);
+    p.add(px + 21, py - 5, hex('#fef08a'), 0.25);
   }
 }

@@ -23,6 +23,9 @@ const checkSanta = document.getElementById('check-santa');
 const selectSantaFreq = document.getElementById('select-santa-freq');
 const btnFlySanta = document.getElementById('btn-fly-santa');
 
+// Holiday Star Tree control
+const checkStarTree = document.getElementById('check-star-tree');
+
 // Music controls
 const musicStatus = document.getElementById('music-status');
 const btnMusicPrev = document.getElementById('btn-music-prev');
@@ -248,6 +251,14 @@ function setupEvents() {
     showToast('🎅 Santa is taking flight!');
   });
 
+  // Holiday Star Tree Action
+  if (checkStarTree) {
+    checkStarTree.addEventListener('change', (e) => {
+      engine.starTreeEnabled = e.target.checked;
+      if (window.livewp) window.livewp.notifySetting('starTreeEnabled', e.target.checked);
+    });
+  }
+
   // Snowman Builder Action
   btnSpawnSnowman.addEventListener('click', () => {
     engine.triggerBuildSnowmanNow();
@@ -379,6 +390,9 @@ function setupEvents() {
       } else if (data.key === 'santaFreq') {
         engine.santaFrequency = data.value;
         selectSantaFreq.value = String(data.value);
+      } else if (data.key === 'starTreeEnabled') {
+        engine.starTreeEnabled = data.value;
+        if (checkStarTree) checkStarTree.checked = data.value;
       } else if (data.key === 'flySantaNow') {
         engine.triggerSantaNow();
         showToast('🎅 Santa taking flight!');
@@ -417,6 +431,10 @@ function setupEvents() {
         pauseText.textContent = engine.isPaused ? '▶ Resume' : '⏸ Pause';
         if (state.insets) {
           engine.setTaskbarInsets(state.insets);
+        }
+        if (state.starTreeEnabled !== undefined) {
+          engine.starTreeEnabled = state.starTreeEnabled;
+          if (checkStarTree) checkStarTree.checked = state.starTreeEnabled;
         }
         applyScale(currentScale);
         updateModeUI(currentMode);

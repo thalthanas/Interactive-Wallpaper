@@ -33,6 +33,7 @@ let santaEnabled = true;
 let santaFreq = 60;
 let musicPlaying = false;
 let musicVolume = 75;
+let starTreeEnabled = true;
 
 // Local HTTP Server to serve renderer over standard http origin (required for YouTube embedded audio)
 const mimeTypes = {
@@ -175,6 +176,7 @@ async function createWindow() {
     santaFreq,
     musicPlaying,
     musicVolume,
+    starTreeEnabled,
     onToggleMode: (mode) => setMode(mode),
     onSetScale: (scale) => setScale(scale),
     onSettingChange: (key, val) => handleSettingChange(key, val),
@@ -250,6 +252,7 @@ function handleSettingChange(key, val) {
   else if (key === 'wind') wind = val;
   else if (key === 'santaEnabled') santaEnabled = val;
   else if (key === 'santaFreq') santaFreq = val;
+  else if (key === 'starTreeEnabled') starTreeEnabled = val;
   else if (key === 'musicCommand') {
     if (val === 'play') musicPlaying = true;
     else if (val === 'pause') musicPlaying = false;
@@ -284,6 +287,7 @@ function updateTray() {
       santaFreq,
       musicPlaying,
       musicVolume,
+      starTreeEnabled,
     });
   }
 }
@@ -314,6 +318,7 @@ ipcMain.handle('get-initial-state', () => {
     santaFreq,
     musicPlaying,
     musicVolume,
+    starTreeEnabled,
     insets,
     displayBounds: primaryDisplay.bounds,
   };
