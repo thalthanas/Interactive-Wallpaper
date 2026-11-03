@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://www.youtube-nocookie.com https://www.youtube.com https://*.ytimg.com https://*.googlevideo.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; script-src 'self' 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LiveWP - Pixel Snow Live Wallpaper</title>
   <link rel="stylesheet" href="style.css">
@@ -11,9 +11,15 @@
   <!-- Pixel Canvas -->
   <canvas id="wallpaper-canvas"></canvas>
 
-  <!-- Floating Control HUD (Toggle with 'H' or hover trigger) -->
-  <div id="hud-trigger" title="Hover or press 'H' to show controls">⚙</div>
+  <!-- Hidden Background YouTube Playlist Audio Player -->
+  <iframe id="yt-player"
+    width="200" height="112"
+    src="https://www.youtube-nocookie.com/embed/S6ZCv6RwbNU?list=PLfP6i5T0-DkKnS-uYUXoFollNjUPMRzWJ&enablejsapi=1&autoplay=0"
+    frameborder="0"
+    allow="autoplay">
+  </iframe>
 
+  <!-- Floating Control HUD (Toggle with 'H') -->
   <div id="hud-panel" class="hidden">
     <div class="hud-header">
       <div class="hud-title">
@@ -43,7 +49,7 @@
       <div class="control-group">
         <div class="label-row">
           <span>Snowfall Density</span>
-          <span id="label-density" class="value-badge">Medium</span>
+          <span id="label-density" class="value-badge">Medium (1.0x)</span>
         </div>
         <input type="range" id="slider-density" min="0.3" max="3.0" step="0.1" value="1.0">
       </div>
@@ -54,7 +60,16 @@
           <span>Drift Piling Speed</span>
           <span id="label-pile" class="value-badge">1.0x</span>
         </div>
-        <input type="range" id="slider-pile" min="0" max="3.0" step="0.2" value="1.0">
+        <input type="range" id="slider-pile" min="0" max="3.5" step="0.2" value="1.0">
+      </div>
+
+      <!-- Max Drift Height -->
+      <div class="control-group">
+        <div class="label-row">
+          <span>Max Pile Height</span>
+          <span id="label-max-height" class="value-badge">25% Screen</span>
+        </div>
+        <input type="range" id="slider-max-height" min="0.10" max="0.55" step="0.05" value="0.25">
       </div>
 
       <!-- Wind Intensity -->
@@ -66,18 +81,59 @@
         <input type="range" id="slider-wind" min="0" max="15" step="1" value="4">
       </div>
 
-      <!-- Mode & Actions -->
+      <!-- Santa's Sleigh -->
+      <div class="control-group section-box">
+        <div class="label-row">
+          <span>🎅 Flying Santa Sleigh</span>
+          <input type="checkbox" id="check-santa" checked>
+        </div>
+        <div class="label-row" style="margin-top: 4px;">
+          <span style="font-size: 11px;">Frequency</span>
+          <select id="select-santa-freq" class="custom-select">
+            <option value="30">Every 30 seconds</option>
+            <option value="60" selected>Every 1 minute</option>
+            <option value="120">Every 2 minutes</option>
+            <option value="180">Every 3 minutes</option>
+          </select>
+        </div>
+        <button id="btn-fly-santa" class="btn btn-secondary btn-sm" style="margin-top: 6px;">
+          <span>🛷 Fly Santa Now!</span>
+        </button>
+      </div>
+
+      <!-- Christmas Music Player -->
+      <div class="control-group section-box">
+        <div class="label-row">
+          <span>🎵 Christmas Music</span>
+          <span id="music-status" class="value-badge">Paused</span>
+        </div>
+        <div class="music-controls">
+          <button id="btn-music-prev" class="btn btn-secondary btn-sm" title="Previous Track">⏮</button>
+          <button id="btn-music-play" class="btn btn-primary btn-sm" title="Play / Pause">▶ Play</button>
+          <button id="btn-music-next" class="btn btn-secondary btn-sm" title="Next Track">⏭</button>
+        </div>
+        <div class="label-row" style="margin-top: 6px;">
+          <span style="font-size: 11px;">Volume</span>
+          <span id="label-volume" class="value-badge">75%</span>
+        </div>
+        <input type="range" id="slider-volume" min="0" max="100" step="5" value="75">
+      </div>
+
+      <!-- Interactive Actions -->
+      <div class="button-row">
+        <button id="btn-spawn-snowman" class="btn btn-secondary btn-sm">
+          <span>⛄ Build Snowman</span>
+        </button>
+        <button id="btn-reset-drift" class="btn btn-secondary btn-sm">
+          <span>🧹 Clear Drift</span>
+        </button>
+      </div>
+
       <div class="button-row">
         <button id="btn-toggle-mode" class="btn btn-primary">
           <span id="mode-icon">🖥️</span>
           <span id="mode-text">Switch to Windowed</span>
         </button>
-        <button id="btn-reset-drift" class="btn btn-secondary">
-          <span>🧹 Reset Drift</span>
-        </button>
-      </div>
-
-      <div class="button-row">
         <button id="btn-toggle-pause" class="btn btn-secondary">
           <span id="pause-text">⏸ Pause</span>
         </button>
@@ -98,4 +154,3 @@
   <script type="module" src="app.js"></script>
 </body>
 </html>
-

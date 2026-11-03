@@ -8,10 +8,12 @@ delete env.ELECTRON_RUN_AS_NODE;
 const args = ['.', ...process.argv.slice(2)];
 const child = spawn(electronPath, args, {
   env,
-  stdio: 'inherit',
+  stdio: ['inherit', 'pipe', 'pipe'],
 });
+
+child.stdout.on('data', (d) => process.stdout.write(d));
+child.stderr.on('data', (d) => process.stderr.write(d));
 
 child.on('close', (code) => {
   process.exit(code ?? 0);
 });
-

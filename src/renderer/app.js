@@ -2,20 +2,40 @@ import { SnowEngine } from './snow-engine.js';
 
 // DOM Elements
 const canvas = document.getElementById('wallpaper-canvas');
+const ytIframe = document.getElementById('yt-player');
 const hudPanel = document.getElementById('hud-panel');
-const hudTrigger = document.getElementById('hud-trigger');
 const btnCloseHud = document.getElementById('btn-close-hud');
+
+// Settings inputs
 const sliderScale = document.getElementById('slider-scale');
 const labelScale = document.getElementById('label-scale');
 const sliderDensity = document.getElementById('slider-density');
 const labelDensity = document.getElementById('label-density');
 const sliderPile = document.getElementById('slider-pile');
 const labelPile = document.getElementById('label-pile');
+const sliderMaxHeight = document.getElementById('slider-max-height');
+const labelMaxHeight = document.getElementById('label-max-height');
 const sliderWind = document.getElementById('slider-wind');
 const labelWind = document.getElementById('label-wind');
+
+// Santa controls
+const checkSanta = document.getElementById('check-santa');
+const selectSantaFreq = document.getElementById('select-santa-freq');
+const btnFlySanta = document.getElementById('btn-fly-santa');
+
+// Music controls
+const musicStatus = document.getElementById('music-status');
+const btnMusicPrev = document.getElementById('btn-music-prev');
+const btnMusicPlay = document.getElementById('btn-music-play');
+const btnMusicNext = document.getElementById('btn-music-next');
+const sliderVolume = document.getElementById('slider-volume');
+const labelVolume = document.getElementById('label-volume');
+
+// Action buttons
+const btnSpawnSnowman = document.getElementById('btn-spawn-snowman');
+const btnResetDrift = document.getElementById('btn-reset-drift');
 const btnToggleMode = document.getElementById('btn-toggle-mode');
 const modeText = document.getElementById('mode-text');
-const btnResetDrift = document.getElementById('btn-reset-drift');
 const btnTogglePause = document.getElementById('btn-toggle-pause');
 const pauseText = document.getElementById('pause-text');
 const fpsCounter = document.getElementById('fps-counter');
@@ -28,6 +48,8 @@ const engine = new SnowEngine(canvas);
 let currentMode = 'wallpaper';
 let currentScale = 6;
 let toastTimeout = null;
+let isMusicPlaying = false;
+let currentVolume = 75;
 
 // FPS calculation
 let lastFrameTime = performance.now();
@@ -73,6 +95,48 @@ function updateModeUI(mode) {
   }
 }
 
+// YouTube Player Commands
+function sendYtCommand(func, args = '') {
+  if (ytIframe && ytIframe.contentWindow) {
+    const payload = JSON.stringify({
+      event: 'command',
+      func: func,
+      args: args,
+    });
+    ytIframe.contentWindow.postMessage(payload, '*');
+  }
+}
+
+function toggleMusicPlay() {
+  isMusicPlaying = !isMusicPlaying;
+  if (isMusicPlaying) {
+    sendYtCommand('playVideo');
+    btnMusicPlay.textContent = '⏸ Pause';
+    musicStatus.textContent = 'Playing 🎵';
+    showToast('Christmas Music: Playing');
+  } else {
+    sendYtCommand('pauseVideo');
+    btnMusicPlay.textContent = '▶ Play';
+    musicStatus.textContent = 'Paused';
+    showToast('Christmas Music: Paused');
+  }
+  if (window.livewp) {
+    window.livewp.notifySetting('musicPlaying', isMusicPlaying);
+  }
+}
+
+function setVolume(vol) {
+  currentVolume = vol;
+  sliderVolume.value = vol;
+  labelVolume.textContent = `${vol}%`;
+  sendYtCommand('setVolume', [vol]);
+  if (vol === 0) {
+    sendYtCommand('mute');
+  } else {
+    sendYtCommand('unMute');
+  }
+}
+
 // Setup Event Listeners
 function setupEvents() {
   window.addEventListener('resize', handleResize);
@@ -82,10 +146,6 @@ function setupEvents() {
     if (e.key === 'h' || e.key === 'H') {
       hudPanel.classList.toggle('hidden');
     }
-  });
-
-  hudTrigger.addEventListener('click', () => {
-    hudPanel.classList.toggle('hidden');
   });
 
   btnCloseHud.addEventListener('click', () => {
@@ -106,14 +166,24 @@ function setupEvents() {
     const d = parseFloat(e.target.value);
     engine.density = d;
     engine.initSnowflakes();
-    labelDensity.textContent = d < 0.6 ? 'Light' : d < 1.4 ? 'Medium' : d < 2.2 ? 'Heavy' : 'Blizzard';
+    labelDensity.textContent = d < 0.6 ? `Light (${d.toFixed(1)}x)` : d < 1.4 ? `Medium (${d.toFixed(1)}x)` : d < 2.2 ? `Heavy (${d.toFixed(1)}x)` : `Blizzard (${d.toFixed(1)}x)`;
+    if (window.livewp) window.livewp.notifySetting('density', d);
   });
 
   // Piling Speed Slider
   sliderPile.addEventListener('input', (e) => {
     const p = parseFloat(e.target.value);
     engine.pileSpeed = p;
-    labelPile.textContent = p === 0 ? 'Off' : `${p.toFixed(1)}x`;
+    labelPile.textContent = p === 0 ? 'Off (0x)' : `${p.toFixed(1)}x`;
+    if (window.livewp) window.livewp.notifySetting('pileSpeed', p);
+  });
+
+  // Max Pile Height Slider
+  sliderMaxHeight.addEventListener('input', (e) => {
+    const mh = parseFloat(e.target.value);
+    engine.maxPileHeightRatio = mh;
+    labelMaxHeight.textContent = `${Math.round(mh * 100)}% Screen`;
+    if (window.livewp) window.livewp.notifySetting('maxHeight', mh);
   });
 
   // Wind Speed Slider
@@ -121,11 +191,57 @@ function setupEvents() {
     const w = parseFloat(e.target.value);
     engine.windBase = w;
     labelWind.textContent = w < 2 ? 'Calm' : w < 6 ? 'Gentle' : w < 10 ? 'Brisk' : 'Gale';
+    if (window.livewp) window.livewp.notifySetting('wind', w);
+  });
+
+  // Santa Controls
+  checkSanta.addEventListener('change', (e) => {
+    engine.santaEnabled = e.target.checked;
+    if (window.livewp) window.livewp.notifySetting('santaEnabled', engine.santaEnabled);
+    showToast(engine.santaEnabled ? 'Flying Santa Enabled' : 'Flying Santa Disabled');
+  });
+
+  selectSantaFreq.addEventListener('change', (e) => {
+    const freq = parseInt(e.target.value, 10);
+    engine.santaFrequency = freq;
+    engine.santaTimer = freq;
+    if (window.livewp) window.livewp.notifySetting('santaFreq', freq);
+  });
+
+  btnFlySanta.addEventListener('click', () => {
+    engine.triggerSantaNow();
+    showToast('🎅 Santa is taking flight!');
+  });
+
+  // Snowman Builder Action
+  btnSpawnSnowman.addEventListener('click', () => {
+    engine.snowmanState = 'WALKING_IN';
+    engine.snowmanTimer = 0;
+    engine.child1.x = -15;
+    engine.child2.x = engine.virtualW + 15;
+    engine.child1.targetX = engine.snowmanX - 14;
+    engine.child2.targetX = engine.snowmanX + 14;
+    engine.snowmanBuildStage = 0;
+    showToast('⛄ Children are coming to build a snowman!');
+  });
+
+  // Music Player Controls
+  btnMusicPlay.addEventListener('click', toggleMusicPlay);
+  btnMusicNext.addEventListener('click', () => {
+    sendYtCommand('nextVideo');
+    showToast('Playing next song 🎵');
+  });
+  btnMusicPrev.addEventListener('click', () => {
+    sendYtCommand('previousVideo');
+    showToast('Playing previous song 🎵');
+  });
+  sliderVolume.addEventListener('input', (e) => {
+    setVolume(parseInt(e.target.value, 10));
   });
 
   // Reset Drift
   btnResetDrift.addEventListener('click', () => {
-    engine.resetDrift();
+    engine.clearDrift();
     showToast('Snow drift cleared!');
   });
 
@@ -143,26 +259,37 @@ function setupEvents() {
     engine.isPaused = !engine.isPaused;
     pauseText.textContent = engine.isPaused ? '▶ Resume' : '⏸ Pause';
     showToast(engine.isPaused ? 'Animation Paused' : 'Animation Resumed');
+    if (engine.isPaused) {
+      engine.interactiveParticles = [];
+    }
   });
 
-  // Windowed Mouse Events
+  // Windowed Mouse Events (respects isPaused)
   window.addEventListener('pointermove', (e) => {
+    if (engine.isPaused) return;
     engine.onMouseMove(e.clientX, e.clientY);
   });
 
   window.addEventListener('pointerdown', (e) => {
+    if (engine.isPaused) return;
     engine.onMouseClick(e.clientX, e.clientY);
   });
 
   // Electron IPC Listeners
   if (window.livewp) {
-    // Global desktop mouse tracker
+    // Desktop mouse tracker from global Win32 hook
     window.livewp.onDesktopMouse((data) => {
+      if (engine.isPaused) return;
       engine.onMouseMove(data.x, data.y);
       if (data.leftDown && !engine.mouseLeftDown) {
         engine.onMouseClick(data.x, data.y);
       }
       engine.mouseLeftDown = data.leftDown;
+    });
+
+    // Taskbar Insets update
+    window.livewp.onTaskbarInsets((insets) => {
+      engine.setTaskbarInsets(insets);
     });
 
     window.livewp.onScaleChange((scale) => {
@@ -180,11 +307,57 @@ function setupEvents() {
     window.livewp.onTogglePause((paused) => {
       engine.isPaused = paused;
       pauseText.textContent = paused ? '▶ Resume' : '⏸ Pause';
+      if (paused) {
+        engine.interactiveParticles = [];
+      }
     });
 
     window.livewp.onResetSnow(() => {
-      engine.resetDrift();
+      engine.clearDrift();
       showToast('Snow drift cleared!');
+    });
+
+    // Tray Settings synchronization
+    window.livewp.onSettingChanged((data) => {
+      if (!data) return;
+      if (data.key === 'density') {
+        engine.density = data.value;
+        engine.initSnowflakes();
+        sliderDensity.value = data.value;
+        labelDensity.textContent = `${data.value.toFixed(1)}x`;
+      } else if (data.key === 'pileSpeed') {
+        engine.pileSpeed = data.value;
+        sliderPile.value = data.value;
+        labelPile.textContent = `${data.value.toFixed(1)}x`;
+      } else if (data.key === 'maxHeight') {
+        engine.maxPileHeightRatio = data.value;
+        sliderMaxHeight.value = data.value;
+        labelMaxHeight.textContent = `${Math.round(data.value * 100)}% Screen`;
+      } else if (data.key === 'wind') {
+        engine.windBase = data.value;
+        sliderWind.value = data.value;
+      } else if (data.key === 'santaEnabled') {
+        engine.santaEnabled = data.value;
+        checkSanta.checked = data.value;
+      } else if (data.key === 'santaFreq') {
+        engine.santaFrequency = data.value;
+        selectSantaFreq.value = String(data.value);
+      } else if (data.key === 'flySantaNow') {
+        engine.triggerSantaNow();
+        showToast('🎅 Santa taking flight!');
+      } else if (data.key === 'musicCommand') {
+        if (data.value === 'play') {
+          if (!isMusicPlaying) toggleMusicPlay();
+        } else if (data.value === 'pause') {
+          if (isMusicPlaying) toggleMusicPlay();
+        } else if (data.value === 'next') {
+          sendYtCommand('nextVideo');
+        } else if (data.value === 'prev') {
+          sendYtCommand('previousVideo');
+        } else if (typeof data.value === 'number') {
+          setVolume(data.value);
+        }
+      }
     });
 
     // Query initial state
@@ -194,6 +367,9 @@ function setupEvents() {
         currentScale = state.scale || 6;
         engine.isPaused = state.isPaused;
         pauseText.textContent = engine.isPaused ? '▶ Resume' : '⏸ Pause';
+        if (state.insets) {
+          engine.setTaskbarInsets(state.insets);
+        }
         applyScale(currentScale);
         updateModeUI(currentMode);
       }
@@ -225,5 +401,4 @@ function loop(now) {
 handleResize();
 setupEvents();
 requestAnimationFrame(loop);
-showToast('LiveWP Started - Pinned to Desktop');
-
+showToast('LiveWP Ready - Press H for Controls');

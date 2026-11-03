@@ -29,32 +29,17 @@ html, body {
   pointer-events: auto;
 }
 
-/* Floating Trigger Icon */
-#hud-trigger {
+/* Background YouTube Audio Player (alive for audio, hidden visually) */
+#yt-player {
   position: fixed;
-  top: 16px;
-  right: 16px;
-  width: 36px;
-  height: 36px;
-  background: rgba(19, 26, 48, 0.6);
-  border: 1px solid rgba(135, 162, 207, 0.3);
-  backdrop-filter: blur(8px);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 18px;
-  color: #c7dbf8;
-  opacity: 0.35;
-  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
-  z-index: 100;
-}
-
-#hud-trigger:hover {
-  opacity: 1;
-  transform: rotate(45deg);
-  background: rgba(31, 43, 71, 0.9);
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0.001;
+  pointer-events: none;
+  border: none;
+  z-index: -9999;
 }
 
 /* Floating HUD Panel */
@@ -62,15 +47,24 @@ html, body {
   position: fixed;
   top: 24px;
   right: 24px;
-  width: 320px;
-  background: rgba(13, 19, 36, 0.88);
+  width: 330px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: rgba(13, 19, 36, 0.92);
   border: 1px solid rgba(135, 162, 207, 0.35);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(135, 162, 207, 0.15);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 16px rgba(135, 162, 207, 0.15);
   backdrop-filter: blur(16px);
   border-radius: 12px;
-  overflow: hidden;
   transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
   z-index: 101;
+}
+
+#hud-panel::-webkit-scrollbar {
+  width: 5px;
+}
+#hud-panel::-webkit-scrollbar-thumb {
+  background: rgba(135, 162, 207, 0.3);
+  border-radius: 3px;
 }
 
 #hud-panel.hidden {
@@ -84,9 +78,12 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
-  background: rgba(25, 35, 62, 0.5);
+  padding: 12px 16px;
+  background: rgba(25, 35, 62, 0.6);
   border-bottom: 1px solid rgba(135, 162, 207, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .hud-title {
@@ -94,7 +91,7 @@ html, body {
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
   color: #ffffff;
   letter-spacing: 0.3px;
 }
@@ -122,16 +119,23 @@ html, body {
 }
 
 .hud-body {
-  padding: 16px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .control-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+}
+
+.section-box {
+  background: rgba(21, 30, 52, 0.6);
+  border: 1px solid rgba(135, 162, 207, 0.2);
+  border-radius: 8px;
+  padding: 10px;
 }
 
 .label-row {
@@ -144,7 +148,7 @@ html, body {
 }
 
 .value-badge {
-  background: rgba(31, 43, 71, 0.8);
+  background: rgba(31, 43, 71, 0.85);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
@@ -153,11 +157,23 @@ html, body {
   border: 1px solid rgba(135, 162, 207, 0.25);
 }
 
+/* Custom Select */
+.custom-select {
+  background: rgba(31, 43, 71, 0.85);
+  border: 1px solid rgba(135, 162, 207, 0.3);
+  color: #e2e8f0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+
 /* Range Inputs */
 input[type="range"] {
   -webkit-appearance: none;
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: rgba(31, 43, 71, 0.9);
   border-radius: 3px;
   outline: none;
@@ -166,8 +182,8 @@ input[type="range"] {
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 0 8px rgba(199, 219, 248, 0.9);
@@ -193,9 +209,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
   gap: 8px;
 }
 
+.music-controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
 .btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
@@ -203,9 +225,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   transition: all 0.15s ease;
   border: 1px solid transparent;
+}
+
+.btn-sm {
+  padding: 5px 8px;
+  font-size: 11px;
 }
 
 .btn-primary {
@@ -219,13 +246,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .btn-secondary {
-  background: rgba(31, 43, 71, 0.7);
+  background: rgba(31, 43, 71, 0.75);
   color: #c7dbf8;
   border-color: rgba(135, 162, 207, 0.3);
 }
 
 .btn-secondary:hover {
-  background: rgba(45, 60, 96, 0.9);
+  background: rgba(45, 60, 96, 0.95);
   color: #ffffff;
 }
 
@@ -238,6 +265,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: #64748b;
   border-top: 1px solid rgba(135, 162, 207, 0.15);
   padding-top: 10px;
+  margin-top: 4px;
 }
 
 .hud-footer strong {
@@ -268,4 +296,3 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
-

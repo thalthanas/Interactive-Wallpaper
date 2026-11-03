@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld('livewp', {
     return () => ipcRenderer.removeListener('desktop-mouse', handler);
   },
 
+  // Taskbar insets listener
+  onTaskbarInsets: (callback) => {
+    const handler = (_event, insets) => callback(insets);
+    ipcRenderer.on('taskbar-insets', handler);
+    return () => ipcRenderer.removeListener('taskbar-insets', handler);
+  },
+
   // State sync listeners
   onScaleChange: (callback) => {
     const handler = (_event, scale) => callback(scale);
@@ -39,9 +46,15 @@ contextBridge.exposeInMainWorld('livewp', {
     return () => ipcRenderer.removeListener('reset-snow', handler);
   },
 
+  onSettingChanged: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('setting-changed', handler);
+    return () => ipcRenderer.removeListener('setting-changed', handler);
+  },
+
   // Actions sent from renderer to main
   requestMode: (mode) => ipcRenderer.invoke('request-mode', mode),
   requestScale: (scale) => ipcRenderer.invoke('request-scale', scale),
+  notifySetting: (key, value) => ipcRenderer.invoke('notify-setting', { key, value }),
   getInitialState: () => ipcRenderer.invoke('get-initial-state'),
 });
-
