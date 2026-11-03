@@ -1,7 +1,7 @@
 {
-  "name": "livewp",
+  "name": "interactive-wallpaper",
   "version": "1.0.0",
-  "description": "Cross-platform interactive live wallpaper app powered by pixelfx",
+  "description": "Interactive retro pixel-art live wallpaper powered by pixelfx",
   "main": "src/main/main.js",
   "type": "module",
   "scripts": {
