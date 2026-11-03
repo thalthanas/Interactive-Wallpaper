@@ -1,8 +1,12 @@
 # Interactive-Wallpaper
 
-An interactive, retro pixel-art live wallpaper application built with **Electron**, **Node.js**, and [`patch-gg/pixelfx`](https://github.com/patch-gg/pixelfx).
+> An interactive retro pixel-art winter wonderland pinned behind your desktop icons. Real-time snowfall physics, snowman builders, flying Santa, and holiday music — every flake rendered in pure pixel art.
 
-Runs seamlessly pinned directly behind your desktop icons (`WorkerW` desktop layering on Windows) with full mouse interaction, customizable pixel density, falling snow physics, multi-snowman building animations, flying Santa sleighs, YouTube holiday music, background winter village, and an animated snowplow clearing machine.
+---
+
+## About
+
+**Interactive-Wallpaper** transforms your desktop into a living, interactive retro pixel-art winter landscape. Pinned seamlessly behind your desktop icons without cluttering your taskbar, it combines physics-driven snowfall accumulation, multi-stage snowman building by cheerful pixel children, a flying Santa sleigh with a glowing Rudolph, embedded royalty-free YouTube holiday music, an optional cozy distant background village, and an animated yellow snowplow clearing machine — fully responsive and customizable in real time.
 
 ---
 
