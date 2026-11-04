@@ -14,6 +14,10 @@
   "build": {
     "appId": "com.thalthanas.interactivewallpaper",
     "productName": "Interactive Wallpaper",
+    "compression": "maximum",
+    "electronLanguages": [
+      "en-US"
+    ],
     "directories": {
       "output": "Executables"
     },
@@ -41,6 +45,7 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
+      "differentialPackage": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
