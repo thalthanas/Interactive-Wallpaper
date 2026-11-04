@@ -59,6 +59,13 @@ function formatSnowScaleLabel(s) {
   return `${s}x`;
 }
 
+function formatWindLabel(w) {
+  if (w === 0) return 'Calm (0)';
+  if (w <= 4) return `Gentle (${w})`;
+  if (w <= 8) return `Brisk (${w})`;
+  return `Gale (${w})`;
+}
+
 let currentMode = 'wallpaper';
 let currentScale = 6;
 let isMusicPlaying = false;
@@ -251,7 +258,7 @@ function setupEvents() {
   sliderWind.addEventListener('input', (e) => {
     const w = parseFloat(e.target.value);
     engine.windBase = w;
-    labelWind.textContent = w < 2 ? 'Calm' : w < 6 ? 'Gentle' : w < 10 ? 'Brisk' : 'Gale';
+    labelWind.textContent = formatWindLabel(w);
     if (window.livewp) window.livewp.notifySetting('wind', w);
   });
 
@@ -410,7 +417,8 @@ function setupEvents() {
         labelMaxHeight.textContent = `${Math.round(data.value * 100)}% Screen`;
       } else if (data.key === 'wind') {
         engine.windBase = data.value;
-        sliderWind.value = data.value;
+        if (sliderWind) sliderWind.value = data.value;
+        if (labelWind) labelWind.textContent = formatWindLabel(data.value);
       } else if (data.key === 'santaEnabled') {
         engine.santaEnabled = data.value;
         checkSanta.checked = data.value;
@@ -481,10 +489,7 @@ function setupEvents() {
         if (state.wind !== undefined) {
           engine.windBase = state.wind;
           if (sliderWind) sliderWind.value = state.wind;
-          if (labelWind) {
-            const w = state.wind;
-            labelWind.textContent = w === 0 ? 'Calm (0)' : w <= 4 ? `Gentle (${w})` : w <= 8 ? `Brisk (${w})` : `Gale (${w})`;
-          }
+          if (labelWind) labelWind.textContent = formatWindLabel(state.wind);
         }
         if (state.santaEnabled !== undefined) {
           engine.santaEnabled = state.santaEnabled;

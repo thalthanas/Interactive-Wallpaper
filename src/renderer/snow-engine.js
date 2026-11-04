@@ -243,7 +243,10 @@ export class SnowEngine {
     if (layerRand > 0.85) layer = 2; // Near (spinning crystal)
     else if (layerRand > 0.5) layer = 1; // Mid (plus/flake)
 
-    const x = Math.random() * this.snowVirtualW;
+    const snowTaskbarLeft = Math.floor((this.insets?.left || 0) / this.snowScale);
+    const snowTaskbarRight = Math.floor((this.insets?.right || 0) / this.snowScale);
+    const usableW = Math.max(10, this.snowVirtualW - snowTaskbarLeft - snowTaskbarRight);
+    const x = snowTaskbarLeft + Math.random() * usableW;
     const y = randomY ? Math.random() * this.snowVirtualH : -10 - Math.random() * 20;
 
     const speedScale = Math.sqrt(this.snowVirtualH / 180);
@@ -569,23 +572,30 @@ export class SnowEngine {
     const snowTaskbarRight = Math.floor((this.insets.right || 0) / this.snowScale);
     const snowBaseY = this.snowVirtualH - Math.floor((this.insets.bottom || 0) / this.snowScale);
 
-    // Smooth periodic gusty wind
-    const wind =
-      this.windBase +
-      5 * Math.sin((TAU * this.time) / 16 + 0.6) +
-      2.5 * Math.sin((TAU * 2 * this.time) / 16 + 2.1);
+    // Gust oscillation: subtle natural fluctuation that scales with windBase
+    const gustFactor = this.windBase > 0
+      ? 1.0 + 0.22 * Math.sin((TAU * this.time) / 12 + 0.6) + 0.12 * Math.sin((TAU * 2 * this.time) / 12 + 2.1)
+      : 0;
 
     // 1. Update continuous snowflakes (simulating in snowflake canvas space)
     for (let i = 0; i < this.snowflakes.length; i++) {
       const f = this.snowflakes[i];
 
+      // Wind ratio: base wind directly controls the slant angle relative to fall speed
+      const layerWindMult = f.layer === 0 ? 0.6 : f.layer === 1 ? 0.85 : 1.0;
+      const windSpeed = f.fallSpeed * (this.windBase / 9) * layerWindMult * gustFactor;
+
       const sway = Math.sin(this.time * f.swaySpeed + f.swayOffset) * f.swayAmp;
-      f.x += (wind * (f.layer === 0 ? 0.35 : f.layer === 1 ? 0.65 : 1.0) + sway) * dt;
+      f.x += (windSpeed + sway) * dt;
       f.y += f.fallSpeed * dt;
       f.spin += f.spinSpeed * dt;
 
-      if (f.x < snowTaskbarLeft - 10) f.x += (this.snowVirtualW - snowTaskbarLeft - snowTaskbarRight) + 20;
-      else if (f.x > this.snowVirtualW - snowTaskbarRight + 10) f.x -= (this.snowVirtualW - snowTaskbarLeft - snowTaskbarRight) + 20;
+      const wrapSpan = (this.snowVirtualW - snowTaskbarLeft - snowTaskbarRight) + 40;
+      if (f.x < snowTaskbarLeft - 20) {
+        f.x += wrapSpan;
+      } else if (f.x > this.snowVirtualW - snowTaskbarRight + 20) {
+        f.x -= wrapSpan;
+      }
 
       // Coordinate mapping to check collision with scene snow drift
       const screenX = f.x * this.snowScale;
@@ -1389,8 +1399,8 @@ export class SnowEngine {
     // Distribute cottages across width, leaving a central corridor for the Holiday Star Tree
     const houseConfigs = [
       { relX: 0.11, w: 15, h: 10, roofH: 6, hasChimney: true, chimneySide: -1, wallColor: '#3d1d11', winCount: 2 },
-      { relX: 0.27, w: 13, h: 9,  roofH: 5, hasChimney: true, chimneySide: 1,  wallColor: '#2b231f', winCount: 1 },
-      { relX: 0.73, w: 14, h: 10, roofH: 6, hasChimney: true, chimneySide: 1,  wallColor: '#362218', winCount: 2 },
+      { relX: 0.27, w: 13, h: 9, roofH: 5, hasChimney: true, chimneySide: 1, wallColor: '#2b231f', winCount: 1 },
+      { relX: 0.73, w: 14, h: 10, roofH: 6, hasChimney: true, chimneySide: 1, wallColor: '#362218', winCount: 2 },
       { relX: 0.89, w: 16, h: 11, roofH: 7, hasChimney: true, chimneySide: -1, wallColor: '#301c13', winCount: 2 },
     ];
 
@@ -1657,10 +1667,10 @@ export class SnowEngine {
 
     // 4 Distinct Tiers of lush pine foliage
     const tiers = [
-      { baseY: groundY - 3,  topY: groundY - 9,  w: 10 },
-      { baseY: groundY - 8,  topY: groundY - 15, w: 8  },
-      { baseY: groundY - 14, topY: groundY - 21, w: 6  },
-      { baseY: groundY - 20, topY: groundY - 26, w: 3  },
+      { baseY: groundY - 3, topY: groundY - 9, w: 10 },
+      { baseY: groundY - 8, topY: groundY - 15, w: 8 },
+      { baseY: groundY - 14, topY: groundY - 21, w: 6 },
+      { baseY: groundY - 20, topY: groundY - 26, w: 3 },
     ];
 
     for (let t = 0; t < tiers.length; t++) {
@@ -1684,15 +1694,15 @@ export class SnowEngine {
 
     // Festive Twinkling Fairy Lights scattered across the tree
     const fairyLights = [
-      { dx: -7, dy: -5,  color: '#ef4444', phase: 0 },
-      { dx:  6, dy: -6,  color: '#fbbf24', phase: 1.2 },
-      { dx: -1, dy: -7,  color: '#38bdf8', phase: 2.1 },
+      { dx: -7, dy: -5, color: '#ef4444', phase: 0 },
+      { dx: 6, dy: -6, color: '#fbbf24', phase: 1.2 },
+      { dx: -1, dy: -7, color: '#38bdf8', phase: 2.1 },
       { dx: -5, dy: -11, color: '#4ade80', phase: 3.0 },
-      { dx:  4, dy: -12, color: '#f43f5e', phase: 4.2 },
-      { dx:  0, dy: -13, color: '#fbbf24', phase: 0.8 },
+      { dx: 4, dy: -12, color: '#f43f5e', phase: 4.2 },
+      { dx: 0, dy: -13, color: '#fbbf24', phase: 0.8 },
       { dx: -3, dy: -17, color: '#38bdf8', phase: 1.7 },
-      { dx:  3, dy: -18, color: '#ef4444', phase: 2.9 },
-      { dx:  0, dy: -23, color: '#4ade80', phase: 3.8 },
+      { dx: 3, dy: -18, color: '#ef4444', phase: 2.9 },
+      { dx: 0, dy: -23, color: '#4ade80', phase: 3.8 },
     ];
 
     for (let i = 0; i < fairyLights.length; i++) {

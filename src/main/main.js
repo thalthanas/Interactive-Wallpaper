@@ -67,10 +67,10 @@ function isAutoStartEnabled() {
       stdio: ['pipe', 'pipe', 'ignore'],
     });
     if (out && out.includes('Interactive Wallpaper')) return true;
-  } catch {}
+  } catch { }
   try {
     if (app.getLoginItemSettings().openAtLogin) return true;
-  } catch {}
+  } catch { }
   return false;
 }
 
@@ -81,19 +81,19 @@ function setAutoStart(enable) {
       execSync(`reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "Interactive Wallpaper" /t REG_SZ /d "\\"${exePath}\\"" /f`, {
         stdio: 'ignore',
       });
-    } catch {}
+    } catch { }
     try {
       app.setLoginItemSettings({ openAtLogin: true, path: exePath });
-    } catch {}
+    } catch { }
   } else {
     try {
       execSync('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "Interactive Wallpaper" /f', {
         stdio: 'ignore',
       });
-    } catch {}
+    } catch { }
     try {
       app.setLoginItemSettings({ openAtLogin: false, path: exePath });
-    } catch {}
+    } catch { }
   }
 }
 
@@ -272,6 +272,15 @@ async function attemptAttachToWallpaper() {
     return;
   }
 
+  // If already attached, do not re-run attachment or cause desktop flashes
+  if (wallpaper.checkAttached(mainWindow)) {
+    if (wallpaperRetryTimer) {
+      clearInterval(wallpaperRetryTimer);
+      wallpaperRetryTimer = null;
+    }
+    return;
+  }
+
   const primaryDisplay = screen.getPrimaryDisplay();
   mainWindow.setBounds(primaryDisplay.bounds);
 
@@ -418,7 +427,7 @@ function cleanup() {
     wallpaperRetryTimer = null;
   }
   if (localServer) {
-    try { localServer.close(); } catch {}
+    try { localServer.close(); } catch { }
   }
   wallpaper.stopMouseTracking();
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -434,7 +443,7 @@ setInterval(() => {
       attemptAttachToWallpaper();
     }
   }
-}, 5000);
+}, 15000);
 
 // IPC Handlers
 ipcMain.handle('get-initial-state', () => {

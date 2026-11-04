@@ -20,6 +20,7 @@ const SetWindowPos = user32.func('BOOL __stdcall SetWindowPos(intptr_t, intptr_t
 const SetWindowLongPtrW = user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t, int, intptr_t)');
 const GetWindowLongPtrW = user32.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t, int)');
 const GetParent = user32.func('intptr_t __stdcall GetParent(intptr_t)');
+const GetAncestor = user32.func('intptr_t __stdcall GetAncestor(intptr_t, uint)');
 const IsWindow = user32.func('BOOL __stdcall IsWindow(intptr_t)');
 const POINT = koffi.struct('POINT', { x: 'long', y: 'long' });
 const GetCursorPos = user32.func('BOOL __stdcall GetCursorPos(_Out_ POINT* pt)');
@@ -30,6 +31,7 @@ const EnumWindows = user32.func('BOOL __stdcall EnumWindows(WNDENUMPROC*, intptr
 
 // Win32 constants
 const GWL_STYLE = -16;
+const GA_PARENT = 1;
 const WS_CHILD = 0x40000000;
 const WS_VISIBLE = 0x10000000;
 const WS_POPUP = 0x80000000;
@@ -154,6 +156,12 @@ export function getHwndFromBuffer(buffer) {
 export async function attachToWallpaper(electronHwndBuf, bounds) {
   try {
     const hwnd = getHwndFromBuffer(electronHwndBuf);
+
+    // If already attached to WorkerW, do NOT re-parent or cause desktop flashes!
+    if (isAttached(electronHwndBuf)) {
+      return true;
+    }
+
     const workerW = await findWorkerWAsync();
 
     if (!workerW) {
@@ -196,8 +204,11 @@ export function isAttached(electronHwndBuf) {
   if (!workerWHwnd) return false;
   try {
     const hwnd = getHwndFromBuffer(electronHwndBuf);
-    const parent = GetParent(hwnd);
-    return parent === workerWHwnd && IsWindow(workerWHwnd) !== 0;
+    const p1 = GetParent(hwnd);
+    const p2 = GetAncestor(hwnd, GA_PARENT);
+    const target = BigInt(workerWHwnd);
+    const matches = (p1 && BigInt(p1) === target) || (p2 && BigInt(p2) === target);
+    return matches && IsWindow(workerWHwnd) !== 0;
   } catch {
     return false;
   }
@@ -210,6 +221,7 @@ export function detachFromWallpaper(electronHwndBuf, bounds) {
   try {
     const hwnd = getHwndFromBuffer(electronHwndBuf);
     SetParent(hwnd, 0n);
+    workerWHwnd = null;
 
     const style = originalStyle || BigInt(WS_POPUP | WS_VISIBLE);
     SetWindowLongPtrW(hwnd, GWL_STYLE, style);
