@@ -48,6 +48,7 @@ const fpsCounter = document.getElementById('fps-counter');
 const resDisplay = document.getElementById('res-display');
 // Initialize Snow Engine
 const engine = new SnowEngine(canvas, snowCanvas);
+window.snowEngine = engine;
 
 function formatSnowScaleLabel(s) {
   if (s === 1) return '1x (Fine - 1080p)';
