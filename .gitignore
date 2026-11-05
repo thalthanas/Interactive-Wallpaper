@@ -6,4 +6,5 @@ Thumbs.db
 *.log
 .gemini/
 Executables/
+*.mp4
 
